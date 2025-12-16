@@ -43,10 +43,6 @@ export class AdminService {
       };
     }
 
-    async getAllAdmins() {
-      return this.db.admin.findMany();
-    }
-
     async login(updateAdminDto: UpdateAdminDto) {
 
       if (!updateAdminDto.username) {
