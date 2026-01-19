@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException,  } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException,  } from '@nestjs/common';
 import { CreateParkingAvenueDto } from './dto/create-parking-avenue.dto';
 import { UpdateParkingAvenueDto } from './dto/update-parking-avenue.dto';
 import { DatabaseService } from '../database/database.service';
@@ -16,6 +16,10 @@ export class ParkingAvenueService {
     
     if (!parkingAvenueOwnerCheck) {
       throw new NotFoundException('Only parking avenue owners can register parking avenues');
+    }
+
+    if (!parkingAvenueOwnerCheck.isVerified){
+      throw new BadRequestException("Only Verified parking avenue owners can register parking avenues")
     }
 
     return this.databaseService.parkingAvenue.create({

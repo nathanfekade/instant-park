@@ -10,16 +10,15 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 export class ParkingAvenueOwnerController {
   constructor(private readonly parkingAvenueOwnerService: ParkingAvenueOwnerService) {}
 
-    @UseGuards(JwtAuthGuard)
+    
     @Post('register')
     @ApiOperation({ summary: 'Register a new parking avenue owner' })
     @ApiBody({ type: CreateParkingAvenueOwnerDto })
     @ApiResponse({ status: 201, description: 'Parking avenue owner registered successfully' })
     @ApiResponse({ status: 400, description: 'Bad request' })
     @ApiResponse({ status: 409, description: 'Conflict, parking avenue owner already exists' })
-    @ApiBearerAuth('JWT-auth')
-    register(@Body() createParkingAvenueOwnerDto: CreateParkingAvenueOwnerDto, @Req() req: RequestWithUser) {
-      return this.parkingAvenueOwnerService.register(createParkingAvenueOwnerDto, req.user.id);
+    register(@Body() createParkingAvenueOwnerDto: CreateParkingAvenueOwnerDto) {
+      return this.parkingAvenueOwnerService.register(createParkingAvenueOwnerDto);
     }
   
     @Post('login')
@@ -34,6 +33,16 @@ export class ParkingAvenueOwnerController {
       return this.parkingAvenueOwnerService.login(updateParkingAvenueOwnerDto);
     }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  @ApiOperation({ summary: 'Get parking avenue owner profile' })
+  @ApiResponse({ status: 200, description: 'Parking avenue owner profile' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiBearerAuth('JWT-auth')
+  me(@Req() req: RequestWithUser) {
+    const id = req.user.id;
+    return this.parkingAvenueOwnerService.getProfile(id);
+  }
 
 
   }
