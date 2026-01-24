@@ -1,10 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsNotEmpty, IsString, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  Min,
+} from 'class-validator';
 import { PARKINGSTATUS } from '@prisma/client';
 
-
 export class CreateParkingAvenueDto {
- @ApiProperty({
+  @ApiProperty({
     description: 'Name of the parking avenue/lot',
     example: 'Downtown Central Parking',
   })
@@ -21,20 +27,22 @@ export class CreateParkingAvenueDto {
   address: string;
 
   @ApiProperty({
-    description: 'Latitude coordinate of the parking location (as string for precision)',
+    description:
+      'Latitude coordinate of the parking location (as string for precision)',
     example: '-1.2921',
   })
   @IsNotEmpty()
-  @IsString()
-  latitude: string;
+  @IsNumber()
+  latitude: number;
 
   @ApiProperty({
-    description: 'Longitude coordinate of the parking location (as string for precision)',
+    description:
+      'Longitude coordinate of the parking location (as string for precision)',
     example: '36.8219',
   })
   @IsNotEmpty()
-  @IsString()
-  longitude: string;
+  @IsNumber()
+  longitude: number;
 
   @ApiProperty({
     description: 'Operating hours of the parking avenue',
@@ -61,7 +69,7 @@ export class CreateParkingAvenueDto {
   @IsEnum(PARKINGSTATUS)
   status: PARKINGSTATUS;
 
- @ApiProperty({
+  @ApiProperty({
     description: 'Current number of parking spots available in the avenue',
     example: 10,
   })

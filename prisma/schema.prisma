@@ -7,27 +7,25 @@
 generator client {
   provider = "prisma-client-js"
   // output   = "../generated/prisma"
-  
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-
 }
 
 model Customer {
-  id	                  String         @id @default(uuid())
-  firstName	            String	
-  lastName	            String	
-  username              String         @unique
-  phoneNo               String	       @unique
-  password              String
-  gender                Gender
-  location              String
-  createdAt	            DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
-  lastLogin             DateTime?
+  id        String    @id @default(uuid())
+  firstName String
+  lastName  String
+  username  String    @unique
+  phoneNo   String    @unique
+  password  String
+  gender    Gender
+  location  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  lastLogin DateTime?
   // bookings	    Booking[]
   // notifications Notification[]
   // favorites    Favorites[]
@@ -40,20 +38,20 @@ enum Gender {
 }
 
 model ParkingAvenue {
-  id	           String                   @id @default(uuid())
-  name           String                   @unique
-  address        String                   @unique
-  latitude       String                   @unique
-  longitude      String                   @unique 
-  ownerId        String           
-  owner          ParkingAvenueOwner       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  workingHrs	   String
-  totalSpots	   Int
-  status	       PARKINGSTATUS
-  currentSpots	 Int
-  photoUrl	     String
-  createdAt	     DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
+  id           String             @id @default(uuid())
+  name         String             @unique
+  address      String             @unique
+  latitude     Float
+  longitude    Float
+  ownerId      String
+  owner        ParkingAvenueOwner @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  workingHrs   String
+  totalSpots   Int
+  status       PARKINGSTATUS
+  currentSpots Int
+  photoUrl     String
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 }
 
 enum PARKINGSTATUS {
@@ -63,19 +61,19 @@ enum PARKINGSTATUS {
 }
 
 model Admin {
-  id	           String          @id @default(uuid())
-  username       String          @unique
-  password       String
-  createdAt	     DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  lastLogin      DateTime?
+  id        String    @id @default(uuid())
+  username  String    @unique
+  password  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  lastLogin DateTime?
 }
 
 model ParkingAvenueOwner {
-  id	           String          @id @default(uuid())
+  id             String          @id @default(uuid())
   username       String          @unique
   password       String
-  createdAt	     DateTime        @default(now())
+  createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   lastLogin      DateTime?
   parkingAvenues ParkingAvenue[]
