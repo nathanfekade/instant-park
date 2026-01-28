@@ -10,15 +10,8 @@ export class ParkingAvenueOwnerService {
  
   constructor( private readonly db: DatabaseService, private readonly jwtService: JwtService,) {}
   
-      async register(createParkingAvenueOwnerDto: CreateParkingAvenueOwnerDto, userId: string) {
+      async register(createParkingAvenueOwnerDto: CreateParkingAvenueOwnerDto) {
 
-        const adminCheck = await this.db.admin.findUnique({
-          where: { id: userId },
-        });
-
-        if (!adminCheck) {
-          throw new UnauthorizedException('Only admins can register parking avenue owners');
-        }
         
         if (!createParkingAvenueOwnerDto.password.length || createParkingAvenueOwnerDto.password.length < 8) {
           throw new BadRequestException(
@@ -26,17 +19,37 @@ export class ParkingAvenueOwnerService {
           );
         }
   
-        const userCheck = await this.db.parkingAvenueOwner.findUnique({
-          where: { username: createParkingAvenueOwnerDto.username },
+        const userCheck = await this.db.parkingAvenueOwner.findFirst({
+          where: {
+            OR: [
+                  { username: createParkingAvenueOwnerDto.username },
+                  { email: createParkingAvenueOwnerDto.email },
+                  { phoneNo: createParkingAvenueOwnerDto.phoneNo },
+              ]
+          }
         });
   
         if (userCheck){
-          throw new ConflictException('Username already exists');
+          if(userCheck.email == createParkingAvenueOwnerDto.email ){
+            throw new ConflictException('email already exists');
+          }
+
+          if(userCheck.phoneNo == createParkingAvenueOwnerDto.phoneNo){
+            throw new ConflictException('phoneNo already exists');
+          }
+
+          if(userCheck.username == createParkingAvenueOwnerDto.username){
+            throw new ConflictException('username already exists');
+          }
         }
   
         const hashedPassword = await bcrypt.hash(createParkingAvenueOwnerDto.password, 10);
         const registeredUser = await this.db.parkingAvenueOwner.create({
           data: {
+            firstName: createParkingAvenueOwnerDto.firstName,
+            lastName: createParkingAvenueOwnerDto.lastName,
+            phoneNo: createParkingAvenueOwnerDto.phoneNo,
+            email: createParkingAvenueOwnerDto.email,
             username: createParkingAvenueOwnerDto.username,
             password: hashedPassword,
           },
@@ -45,7 +58,6 @@ export class ParkingAvenueOwnerService {
           
         return {
           parkingAvenueOwner: {
-            id: registeredUser.id,
             username: createParkingAvenueOwnerDto.username,
           },
           message: 'Registration successful',
@@ -89,5 +101,23 @@ export class ParkingAvenueOwnerService {
   
         return { accessToken };
       }
+
+  async getProfile(id: string) {
+    const parkingAvenueOwner = await this.db.parkingAvenueOwner.findUnique({
+      where: { id },
+      select: {
+        phoneNo: true,
+        firstName: true,
+        username: true,
+        lastName: true,
+        email: true,
+      },
+    });
+
+    if (!parkingAvenueOwner) {
+      throw new NotFoundException('Parking avenue owner not found');
+    }
+    return parkingAvenueOwner;
+  }
   
 }

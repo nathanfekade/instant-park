@@ -55,11 +55,16 @@ CREATE TABLE "Admin" (
 -- CreateTable
 CREATE TABLE "ParkingAvenueOwner" (
     "id" TEXT NOT NULL,
+    "firstName" TEXT NOT NULL,
+    "lastName" TEXT NOT NULL,
     "username" TEXT NOT NULL,
     "password" TEXT NOT NULL,
+    "phoneNo" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "lastLogin" TIMESTAMP(3),
+    "isVerified" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "ParkingAvenueOwner_pkey" PRIMARY KEY ("id")
 );
@@ -81,6 +86,12 @@ CREATE UNIQUE INDEX "Admin_username_key" ON "Admin"("username");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ParkingAvenueOwner_username_key" ON "ParkingAvenueOwner"("username");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ParkingAvenueOwner_phoneNo_key" ON "ParkingAvenueOwner"("phoneNo");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ParkingAvenueOwner_email_key" ON "ParkingAvenueOwner"("email");
 
 -- AddForeignKey
 ALTER TABLE "ParkingAvenue" ADD CONSTRAINT "ParkingAvenue_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "ParkingAvenueOwner"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

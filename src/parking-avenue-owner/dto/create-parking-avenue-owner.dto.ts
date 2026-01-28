@@ -1,7 +1,24 @@
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger'; 
+import { IsNotEmpty, IsString, MinLength, IsOptional, IsEmail } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'; 
 
 export class CreateParkingAvenueOwnerDto {
+    
+    @ApiProperty({
+        description: 'Parking avenue owner first name',
+        example: 'John',
+    })
+    @IsNotEmpty()
+    @IsString()
+    firstName: string;
+
+    @ApiProperty({
+        description: 'Parking avenue owner last name',
+        example: 'Doe',
+    })
+    @IsNotEmpty()
+    @IsString()
+    lastName: string;
+    
     @ApiProperty({
         description: 'The unique parking avenue owner username',
         example: 'username123',
@@ -9,11 +26,27 @@ export class CreateParkingAvenueOwnerDto {
     @IsString()
     @IsNotEmpty()
     username: string;
+
+    @ApiProperty({
+        description: 'Email of parking avenue owner',
+        example: 'john@gmail.com',
+    })
+    @IsEmail()
+    @IsNotEmpty()
+    email: string;
+
+    @ApiPropertyOptional({
+        description: 'Phone number',
+        example: '+251934567890',
+      })
+    @IsOptional()
+    @IsString()
+    phoneNo: string;
     
     @ApiProperty({
-    description: 'The secure password for the parking avenue owner account.',
-    example: 'P@ssword1234!',
-    minLength: 8,
+        description: 'The secure password for the parking avenue owner account.',
+        example: 'P@ssword1234!',
+        minLength: 8,
     })
     @IsString()
     @IsNotEmpty()
