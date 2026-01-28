@@ -1,12 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, Query } from '@nestjs/common';
 import { ParkingAvenueService } from './parking-avenue.service';
 import { CreateParkingAvenueDto } from './dto/create-parking-avenue.dto';
 import { UpdateParkingAvenueDto } from './dto/update-parking-avenue.dto';
 import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
-
-
+import { SearchParkingDto } from './dto/search-parking-avenue.dto';
 
 @Controller('parking-avenue')
 export class ParkingAvenueController {
@@ -27,6 +26,13 @@ export class ParkingAvenueController {
   @Get()
   findAll() {
     return this.parkingAvenueService.findAll();
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Find nearby parking avenues' })
+  @ApiResponse({ status: 200, description: 'List of nearby parking avenues sorted by distance' })
+  search(@Body() searchDto: SearchParkingDto) {
+    return this.parkingAvenueService.findNearby(searchDto);
   }
 
   @Get(':id')
