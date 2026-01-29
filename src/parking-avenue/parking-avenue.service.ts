@@ -35,7 +35,7 @@ export class ParkingAvenueService {
 
     // 6371 is the radius of the Earth in km
     const results = await this.databaseService.$queryRaw<ParkingAvenue[]>`
-        SELECT *,
+        SELECT id, name, address, latitude, longitude, status, 
         (
           6371 * acos(
             cos(radians(${latitude})) * cos(radians(latitude)) * cos(radians(longitude) - radians(${longitude})) +
