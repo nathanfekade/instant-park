@@ -8,6 +8,7 @@ import { AdminModule } from './admin/admin.module';
 import { ParkingAvenueOwnerModule } from './parking-avenue-owner/parking-avenue-owner.module';
 import { ConfigModule } from '@nestjs/config';
 import { VehicleModule } from './vehicle/vehicle.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { VehicleModule } from './vehicle/vehicle.module';
     AuthModule,
     ParkingAvenueModule, 
     AdminModule, 
-    ParkingAvenueOwnerModule,
+    ParkingAvenueOwnerModule, PaymentModule,
     ConfigModule.forRoot({
       isGlobal: true, 
       envFilePath: '.env', 
