@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Req, Headers } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -8,7 +8,7 @@ import { InitializePaymentDto } from './dto/initialize-payment.dto';
 @ApiTags('Payment')
 @Controller('payment')
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(private readonly paymentService: PaymentService) { }
 
   // FIX: removed auth guard because I was getting 401
   @Post('initialize')
@@ -25,5 +25,16 @@ export class PaymentController {
   @ApiResponse({ status: 400, description: 'Invalid transaction or verification failed' })
   confirm(@Body() confirmPaymentDto: ConfirmPaymentDto) {
     return this.paymentService.confirmPayment(confirmPaymentDto);
+  }
+
+  @Post('webhook')
+  @ApiOperation({ summary: 'Chapa Webhook listener' })
+  async handleWebhook(
+    @Headers('x-chapa-signature') signature: string,
+    @Body() event: any
+  ) {
+    console.log('WEBHOOK RECEIVED!', event);
+
+    return this.paymentService.processWebhook(signature, event);
   }
 }

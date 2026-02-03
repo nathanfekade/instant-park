@@ -1,1 +1,5 @@
 isVerified field should be in parkingAvenue instead of parkingAvenueOwner
+reservation status should be an enum
+email field for customers
+handle cover image upload when creating parkingAvenue
+removed auth guard because I was getting 401, needs to be added later

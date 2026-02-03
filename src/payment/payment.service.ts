@@ -5,11 +5,11 @@ import axios from 'axios';
 import * as QRCode from 'qrcode';
 import { env } from 'process';
 import { InitializePaymentDto } from './dto/initialize-payment.dto';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class PaymentService {
     private readonly logger = new Logger(PaymentService.name);
-    private readonly CALLBACK_URL = ''; // TODO: we need to figure out how to handle the callback since its the backend is running locally
     constructor(private readonly databaseService: DatabaseService) { }
 
     async initializePayment(dto: InitializePaymentDto) {
@@ -39,6 +39,7 @@ export class PaymentService {
             last_name: user.lastName,
             phone_number: user.phoneNo,
             tx_ref: tx_ref,
+            callback_url: env.CALLBACK_URL,
             customization: {
                 title: 'Reservation',
                 description: `Payment for booking ${reservation.bookingRef}`,
@@ -124,6 +125,57 @@ export class PaymentService {
     }
 
     async processWebhook(signature: string, event: any) {
-        return 'on receiving webhook'
+        const secret = env.CHAPA_SECRET_KEY;
+        if (!secret) {
+            throw new Error('CHAPA_SECRET_KEY is not defined');
+        }
+
+        const hash = crypto
+            .createHmac('sha256', secret)
+            .update(JSON.stringify(event))
+            .digest('hex');
+
+        if (hash !== signature) {
+            this.logger.warn('Invalid Webhook Signature');
+            // throw new BadRequestException('Invalid signature'); 
+        }
+
+        if (event.status !== 'success') {
+            return { message: 'Ignored: Payment not successful' };
+        }
+
+        const tx_ref = event.tx_ref;
+
+        const reservation = await this.databaseService.reservation.findUnique({
+            where: { transactionReference: tx_ref },
+        });
+
+        if (!reservation) {
+            this.logger.error(`Reservation with ref ${tx_ref} not found`);
+            throw new NotFoundException('Reservation not found');
+        }
+
+        if (reservation.status === 'CONFIRMED') {
+            return { message: 'Already confirmed' };
+        }
+
+        const qrPayload = JSON.stringify({
+            ref: reservation.bookingRef,
+            pid: reservation.parkingAvenueId,
+            start: reservation.startTime,
+            end: reservation.endTime,
+        });
+        const qrCodeDataUrl = await QRCode.toDataURL(qrPayload);
+
+        await this.databaseService.reservation.update({
+            where: { id: reservation.id },
+            data: {
+                status: 'CONFIRMED',
+                qrCode: qrCodeDataUrl,
+            },
+        });
+
+        this.logger.log(`Payment confirmed for ${reservation.bookingRef}`);
+        return { status: 'success' };
     }
 }
