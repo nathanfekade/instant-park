@@ -7,6 +7,7 @@ import { ParkingAvenue } from '@prisma/client';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { v4 as uuidv4 } from 'uuid';
 import { GetReservationsDto } from './dto/get-reservations.dto';
+import { GetCheckInsDto } from './dto/get-check-ins.dto';
 
 @Injectable()
 export class ParkingAvenueService {
@@ -39,7 +40,7 @@ export class ParkingAvenueService {
 
     // 6371 is the radius of the Earth in km
     const results = await this.databaseService.$queryRaw<ParkingAvenue[]>`
-        SELECT id, name, address, latitude, longitude, status, hourlyRate, photoUrl
+        SELECT id, name, address, latitude, longitude, status, "hourlyRate", "photoUrl",
         (
           6371 * acos(
             cos(radians(${latitude})) * cos(radians(latitude)) * cos(radians(longitude) - radians(${longitude})) +
@@ -175,19 +176,41 @@ export class ParkingAvenueService {
     }
   }
 
-  findAll() {
-    return `This action returns all parkingAvenue`;
-  }
+  async getAvenueCheckIns(parkingAvenueId: string, dto: GetCheckInsDto) {
+    const { page = 1, limit = 10 } = dto;
+    const skip = (page - 1) * limit;
 
-  findOne(id: number) {
-    return `This action returns a #${id} parkingAvenue`;
-  }
+    const [data, total] = await Promise.all([
+      this.databaseService.checkIn.findMany({
+        where: { parkingAvenueId },
+        skip,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phoneNo: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' }, 
+      }),
+      this.databaseService.checkIn.count({ where: { parkingAvenueId } }),
+    ]);
 
-  update(id: number, updateParkingAvenueDto: UpdateParkingAvenueDto) {
-    return `This action updates a #${id} parkingAvenue`;
-  }
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+        hasNextPage: page < Math.ceil(total / limit),
+        hasPreviousPage: page >
 
-  remove(id: number) {
-    return `This action removes a #${id} parkingAvenue`;
+          1,
+      },
+    };
   }
 }

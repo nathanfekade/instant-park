@@ -8,6 +8,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nes
 import { SearchParkingDto } from './dto/search-parking-avenue.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { GetReservationsDto } from './dto/get-reservations.dto';
+import { GetCheckInsDto } from './dto/get-check-ins.dto';
 
 @Controller('parking-avenue')
 export class ParkingAvenueController {
@@ -25,21 +26,11 @@ export class ParkingAvenueController {
     return this.parkingAvenueService.create(createParkingAvenueDto, req.user.id);
   }
 
-  @Get()
-  findAll() {
-    return this.parkingAvenueService.findAll();
-  }
-
   @Get('search')
   @ApiOperation({ summary: 'Find nearby parking avenues' })
   @ApiResponse({ status: 200, description: 'List of nearby parking avenues sorted by distance' })
-  search(@Body() searchDto: SearchParkingDto) {
+  search(@Query() searchDto: SearchParkingDto) {
     return this.parkingAvenueService.findNearby(searchDto);
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.parkingAvenueService.findOne(+id);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -53,7 +44,7 @@ export class ParkingAvenueController {
   }
 
   //@UseGuards(JwtAuthGuard)
-  @Get(':id/reservations')
+  @Get('reservations/:id')
   //@ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get paginated reservations for a parking lot' })
   @ApiResponse({ status: 200, description: 'List of reservations with pagination meta' })
@@ -72,13 +63,8 @@ export class ParkingAvenueController {
     return this.parkingAvenueService.verifyPayment(ref);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateParkingAvenueDto: UpdateParkingAvenueDto) {
-    return this.parkingAvenueService.update(+id, updateParkingAvenueDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.parkingAvenueService.remove(+id);
+  @Get('check-ins/:id')
+  async getAvenueCheckIns(@Param('id') parkingAvenueId: string, @Query() query: GetCheckInsDto,) {
+    return this.parkingAvenueService.getAvenueCheckIns(parkingAvenueId, query);
   }
 }
