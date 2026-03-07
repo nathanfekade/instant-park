@@ -1,9 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException, } from '@nestjs/common';
 import { CreateParkingAvenueDto } from './dto/create-parking-avenue.dto';
 import { UpdateParkingAvenueDto } from './dto/update-parking-avenue.dto';
 import { DatabaseService } from '../database/database.service';
 import { SearchParkingDto } from './dto/search-parking-avenue.dto';
-import { ApprovalStatus, ParkingAvenue } from '@prisma/client';
+import { ApprovalStatus, ParkingAvenue, Prisma } from '@prisma/client';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { v4 as uuidv4 } from 'uuid';
 import { GetReservationsDto } from './dto/get-reservations.dto';
@@ -14,6 +14,7 @@ import { GetNameParkingAvenueDto } from './dto/get-name-parking-avenue.dto';
 import { CreateParkingAvenueImageDto } from './dto/create-parking-avenue-image.dto';
 import { GetMyParkingAvenueDetailDto } from './dto/get-my-parking-avenue-detail.dto';
 import axios from 'axios';
+import { GetParkingAvenueDetailDto } from './dto/get-parking-avenue-detail.dto';
 
 @Injectable()
 export class ParkingAvenueService {
@@ -90,7 +91,6 @@ export class ParkingAvenueService {
   }
 
   async getParkingAvenueDetail(parkingAvenueId: string, eta: number){
-    
     const parkingAvenue = await this.databaseService.parkingAvenue.findFirst(
       {
         where: {
@@ -113,27 +113,47 @@ export class ParkingAvenueService {
       throw new NotFoundException("You do not have any parking avenues");
     }
 
-    let prediction = null;
+    interface PredictionResponse {
+      predicted_occupancy_rate: number; 
+      confidence_score: number;
+    }
+
+    let parkingAvenueDetail = {} as GetParkingAvenueDetailDto;
 
     try {
-      // Ask the AI Microservice for a prediction
-      const aiResponse = await axios.post(`${this.AI_SERVICE_URL}/predict`, {
+      // Ask the AI service for a prediction
+      const aiResponse = await axios.post<PredictionResponse>(`${this.AI_SERVICE_URL}/predict`, {
         parking_avenue_id: parkingAvenue.id,
         eta_minutes: eta,
       });
-      
-      prediction = aiResponse.data;
+
+      parkingAvenueDetail.prediction = aiResponse.data.predicted_occupancy_rate;
+      parkingAvenueDetail.confidence = aiResponse.data.confidence_score;
     } catch (error) {
       this.logger.warn(`AI prediction unavailable for lot ${parkingAvenue.id}`);
     }
 
-    return prediction;
+    parkingAvenueDetail.parkingAvenue = parkingAvenue as unknown as ParkingAvenue;
+
+    return parkingAvenueDetail;
   }
 
   async createReservation(dto: CreateReservationDto, userId: string) {
-    const { parkingAvenueId, startTime, durationHours } = dto;
+    const { parkingAvenueId, startTime, durationHours, plateNumber } = dto;
     const start = new Date(startTime);
     const end = new Date(start.getTime() + durationHours * 60 * 60 * 1000);
+
+    const existingPending = await this.databaseService.reservation.findFirst({
+      where: {
+        userId,
+        parkingAvenueId,
+        status: 'PENDING',
+      },
+    });
+  
+    if (existingPending) {
+      throw new ConflictException('You already have a pending reservation for this avenue.');
+    }
 
     const parkingSpot = await this.databaseService.parkingAvenue.findUnique({
       where: { id: parkingAvenueId },
@@ -161,39 +181,53 @@ export class ParkingAvenueService {
     }
 
     const totalPrice = parkingSpot.hourlyRate * durationHours;
-
     const bookingRef = `PK-${uuidv4().substring(0, 8).toUpperCase()}`;
 
-    const reservation = await this.databaseService.reservation.create({
-      data: {
-        bookingRef,
-        startTime: start,
-        endTime: end,
-        durationHours,
-        totalPrice,
-        status: 'PENDING',
-        userId,
-        parkingAvenueId,
-      },
-    });
+    try {
+      const reservation = await this.databaseService.reservation.create({
+        data: {
+          bookingRef,
+          startTime: start,
+          endTime: end,
+          durationHours,
+          totalPrice,
+          status: 'PENDING',
+          plateNumber,
+          userId,
+          parkingAvenueId,
+        },
+      });
 
-    this.eventEmitter.emit( // emitting the event
-      'live.activity', // event name
-      new LiveActivityEvent(
-        'RESERVATION',
-        `New reservation at ${parkingSpot.name}`,
-        new Date(),
-        { amount: reservation.totalPrice, parkingId: parkingSpot.id }
-      )
-    );
+      this.eventEmitter.emit( // emitting the event
+        'live.activity', // event name
+        new LiveActivityEvent(
+          'RESERVATION',
+          `New reservation at ${parkingSpot.name}`,
+          new Date(),
+          { amount: reservation.totalPrice, parkingId: parkingSpot.id }
+        )
+      );
 
-    return {
-      message: 'Reservation initiated. Proceed to payment.',
-      reservationId: reservation.id,
-      bookingRef: reservation.bookingRef,
-      totalPrice: reservation.totalPrice,
-      status: reservation.status
-    };
+      return {
+        message: 'Reservation initiated. Proceed to payment.',
+        reservationId: reservation.id,
+        bookingRef: reservation.bookingRef,
+        totalPrice: reservation.totalPrice,
+        status: reservation.status
+      };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new ConflictException(
+            'You already have a reservation for this parking avenue.'
+          );
+        }
+        throw error;
+      }
+
+      console.error('Reservation creation failed:', error);
+      throw new InternalServerErrorException('Failed to create reservation');
+    }
   }
 
   async getReservations(parkingAvenueId: string, query: GetReservationsDto) {
