@@ -9,5 +9,15 @@ export class GetParkingAvenueDetailDto {
   @IsNotEmpty()
   parkingAvenue: ParkingAvenue;
 
-  
+  @ApiProperty({
+    description: 'availability prediction',
+  })
+  @IsNotEmpty()
+  prediction: number;
+
+  @ApiProperty({
+    description: 'confindence in prediction',
+  })
+  @IsNotEmpty()
+  confidence: number;
 }

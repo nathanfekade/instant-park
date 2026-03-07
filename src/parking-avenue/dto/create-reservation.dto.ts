@@ -16,4 +16,8 @@ export class CreateReservationDto {
   @IsInt()
   @Min(1)
   durationHours: number;
+
+  @IsString()
+  @IsNotEmpty()
+  plateNumber: string;
 }

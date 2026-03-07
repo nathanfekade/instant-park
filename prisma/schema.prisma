@@ -108,6 +108,7 @@ model Reservation {
   status               String   @default("PENDING") // PENDING, CONFIRMED, CANCELLED
   qrCode               String?
   transactionReference String?  @unique
+  plateNumber          String   @unique
 
   userId          String
   user            Customer      @relation(fields: [userId], references: [id])
