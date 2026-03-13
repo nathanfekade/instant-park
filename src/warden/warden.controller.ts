@@ -3,12 +3,12 @@ import { WardenService } from './warden.service';
 import { CreateWardenDto } from './dto/create-warden.dto';
 import { UpdateWardenDto } from './dto/update-warden.dto';
 import type { RequestWithUser } from '../auth/express-request-with-user.interface';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { UpdateParkingAvenueOwnerDto } from 'src/parking-avenue-owner/dto/update-parking-avenue-owner.dto';
-import { LoginDto } from 'src/auth/dto/login.dto';
-import { LoginVerifyDto } from 'src/auth/dto/loginVerify.dto';
-import { GetMyParkingAvenueDetailDto } from 'src/parking-avenue/dto/get-parking-avenue-detail.dto';
+import { LoginDto } from '../auth/dto/login.dto';
+import { LoginVerifyDto } from '../auth/dto/loginVerify.dto';
+import { GetMyParkingAvenueDetailDto } from '../parking-avenue/dto/get-parking-avenue-detail.dto';
 import { GetUsernameWardenDto } from './dto/get-username-warden.dto';
 import { GetPhoneNoWardenDto } from './dto/get-phoneno-warden.dto';
 
