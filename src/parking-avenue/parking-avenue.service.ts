@@ -15,6 +15,7 @@ import { CreateParkingAvenueImageDto } from './dto/create-parking-avenue-image.d
 import { GetMyParkingAvenueDetailDto } from './dto/get-my-parking-avenue-detail.dto';
 import axios from 'axios';
 import { GetParkingAvenueDetailDto } from './dto/get-parking-avenue-detail.dto';
+const PAGE_SIZE = 10;
 
 @Injectable()
 export class ParkingAvenueService {
@@ -23,6 +24,16 @@ export class ParkingAvenueService {
     private readonly databaseService: DatabaseService,
     private readonly eventEmitter: EventEmitter2,
   ) { }
+
+  paginate(items: any[]) {
+      const hasMore = items.length > PAGE_SIZE;
+      const data = hasMore ? items.slice(0, PAGE_SIZE) : items;
+      const nextCursor = hasMore
+        ? data[data.length - 1].id
+        : null;
+
+        return { data, hasMore, nextCursor };
+    }
 
   private readonly AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
@@ -328,13 +339,18 @@ export class ParkingAvenueService {
     };
   }
 
-  async getMyParkingAvenueList(parkingAvenueOwnerId: string){
+  async getMyParkingAvenueList(parkingAvenueOwnerId: string, cursor?: string){
     
     const parkingAvenues = await this.databaseService.parkingAvenue.findMany(
       {
         where: {
-          ownerId: parkingAvenueOwnerId
-        }
+          ownerId: parkingAvenueOwnerId,
+            ...(cursor ? { id: { gt: cursor } } : {}),
+        },
+        orderBy: {
+            id: 'asc',
+          },
+          take: PAGE_SIZE + 1
       }
     );
 
@@ -342,7 +358,7 @@ export class ParkingAvenueService {
       throw new NotFoundException("You do not have any parking avenues");
     }
 
-    return parkingAvenues;
+    return this.paginate(parkingAvenues);
   }
 
     async getMyParkingAvenueDetail(parkingAvenueOwnerId: string, parkingAvenueId: string){
