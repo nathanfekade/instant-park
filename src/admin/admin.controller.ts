@@ -129,7 +129,7 @@ export class AdminController {
   
   @UseGuards(JwtAuthGuard)
   @Get('avenueapprovalstatus')
-  @ApiOperation({ summary: 'Get parking avenue by without approval status filter' })
+  @ApiOperation({ summary: 'Get parking avenues without approval status filter' })
   @ApiBearerAuth('JWT-auth')
   @ApiQuery({ name: 'cursor', required: false, type: String }) 
   getWithoutApprovalStatus(@Req() req: RequestWithUser, @Query('cursor') cursor?: string){
@@ -140,7 +140,7 @@ export class AdminController {
   @Get('ownerapprovalStatus')
   @ApiBearerAuth('JWT-auth')
   @ApiQuery({ name: 'cursor', required: false, type: String }) 
-  @ApiOperation({ summary: 'Get parking avenue owners without approval status'})
+  @ApiOperation({ summary: 'Get parking avenue owners without approval status filter'})
   parkingAvenueOwnerWithoutApprovalStatus(@Req() req: RequestWithUser, @Query('cursor') cursor?: string){
     return this.adminService.parkingAvenueOwnerWithoutApprovalStatus(req.user.id, this.parseCursor(cursor))
   }

@@ -134,16 +134,21 @@ export class AdminService {
       });
 
       if(!isAdmin){
-        throw new UnauthorizedException("Only admin can see list of unverified users.")
+        throw new UnauthorizedException("Only admin can perform this action.")
       }
       
+      if (updateVerificationDto.approvalStatus === 'REJECTED' && !updateVerificationDto.rejectionReason) {
+        throw new BadRequestException("Rejection reason is required when rejecting an owner.");
+      }
 
       const updateStatus = await this.db.parkingAvenueOwner.update({
         where: {
           username: updateVerificationDto.username,
         },
         data: {
-          isVerified: updateVerificationDto.approvalStatus
+          isVerified: updateVerificationDto.approvalStatus,
+          rejectionReason: updateVerificationDto.approvalStatus === 'APPROVED' 
+            ? null : updateVerificationDto.rejectionReason,
         },
         omit: {
           password: true
@@ -240,7 +245,11 @@ export class AdminService {
     );
 
     if(!checkAdminId){
-      throw new NotFoundException("Only admin is allowed to view approval status")
+      throw new NotFoundException("Only admin can perform this action,")
+    }
+
+    if(updateApprovalStatus.approvalStatus === 'REJECTED' && !updateApprovalStatus.rejectionReason){
+        throw new BadRequestException("Rejection reason is required when rejecting parking avenue.");
     }
 
     const checkParkingAvenue = await this.db.parkingAvenue.findUnique(
@@ -261,7 +270,9 @@ export class AdminService {
           id: updateApprovalStatus.id
         },
         data: {
-          approvalStatus: updateApprovalStatus.approvalStatus
+          approvalStatus: updateApprovalStatus.approvalStatus,
+          rejectionReason: updateApprovalStatus.approvalStatus === 'APPROVED'?
+            null : updateApprovalStatus.rejectionReason,
         }
       }
     );
