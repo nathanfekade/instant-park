@@ -8,12 +8,17 @@ import { Admin, ParkingAvenueType } from '@prisma/client';
 import { GetByApprovalStatus } from './dto/get-by-approval-status.dto';
 import { UpdateApprovalStatus } from './dto/update-approval-status.dto';
 import { UpdateVerificationDto } from './dto/update-verification-dto';
+import { EmailService } from 'src/email/email.service';
 const PAGE_SIZE = 10;
 
 @Injectable()
 export class AdminService {
   
-    constructor( private readonly db: DatabaseService, private readonly jwtService: JwtService,) {}
+    constructor( 
+      private readonly db: DatabaseService, 
+      private readonly jwtService: JwtService, 
+      private readonly  emailService: EmailService,
+    ) {}
 
     paginate(items: any[]) {
       const hasMore = items.length > PAGE_SIZE;
@@ -141,6 +146,12 @@ export class AdminService {
         throw new BadRequestException("Rejection reason is required when rejecting an owner.");
       }
 
+      const owner = await this.db.parkingAvenueOwner.findUnique({
+        where: { username: updateVerificationDto.username }
+      });
+
+      if (!owner) throw new NotFoundException("Owner not found");
+
       const updateStatus = await this.db.parkingAvenueOwner.update({
         where: {
           username: updateVerificationDto.username,
@@ -154,6 +165,22 @@ export class AdminService {
           password: true
         }
       });
+
+      if(updateVerificationDto.approvalStatus ==="APPROVED"){
+        updateVerificationDto.rejectionReason = '';
+      }
+
+      try {
+        await this.emailService.sendVerificationEmail(
+          owner.email,
+          owner.firstName,
+          updateVerificationDto.approvalStatus,
+          `Your parking avenue owner account status has been updated to`,
+          updateVerificationDto.rejectionReason
+        );
+      } catch (error) {
+        console.error("Failed to send email", error);
+      }
 
       return updateStatus
       
@@ -252,15 +279,18 @@ export class AdminService {
         throw new BadRequestException("Rejection reason is required when rejecting parking avenue.");
     }
 
-    const checkParkingAvenue = await this.db.parkingAvenue.findUnique(
+    const parkingAvenue = await this.db.parkingAvenue.findUnique(
       {
         where: {
           id: updateApprovalStatus.id
+        },
+        include : {
+          owner: true
         }
       }
     );
 
-    if(!checkParkingAvenue){
+    if(!parkingAvenue){
       throw new NotFoundException('Parking avenue with this id does not exist')
     }
 
@@ -276,6 +306,22 @@ export class AdminService {
         }
       }
     );
+
+    if(updateApprovalStatus.approvalStatus ==="APPROVED"){
+        updateApprovalStatus.rejectionReason = '';
+      }
+
+    try {
+      await this.emailService.sendVerificationEmail(
+        parkingAvenue.owner.email,
+        parkingAvenue.owner.firstName,
+        updateApprovalStatus.approvalStatus,
+        `Your parking avenue status has been updated to`,
+        updateApprovalStatus.rejectionReason
+      );
+  } catch (error) {
+    console.error("Failed to send approval email", error);
+  }
 
     return updateStatus
   }

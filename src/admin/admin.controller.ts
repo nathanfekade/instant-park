@@ -118,7 +118,7 @@ export class AdminController {
 
 
   @UseGuards(JwtAuthGuard)
-  @Patch('update-approval-statuss')
+  @Patch('update-approval-status')
   @ApiOperation({ summary: 'update the approval status of a parking avenue' })
   @ApiBody({ type: UpdateApprovalStatus})
   @ApiBearerAuth('JWT-auth')

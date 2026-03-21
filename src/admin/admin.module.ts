@@ -7,9 +7,11 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { JwtStrategy } from 'src/auth/guards/jwt.strategy';
 import { JwtModule } from '@nestjs/jwt';
+import { EmailModule } from 'src/email/email.module';
 
 @Module({
   imports: [
+    EmailModule,
     DatabaseModule,
     PassportModule,
     ConfigModule, 
