@@ -95,7 +95,7 @@ export class AdminService {
       return { accessToken };
     }
 
-    async parkingAvenueOwnerStatus(getByApprovalStatus: GetByApprovalStatus, adminId: string) {
+    async parkingAvenueOwnerStatus(getByApprovalStatus: GetByApprovalStatus, adminId: string, cursor?: string) {
 
       const isAdmin = await this.db.admin.findUnique({
         where: {
@@ -107,16 +107,21 @@ export class AdminService {
         throw new UnauthorizedException("Only admin is allowed to view approval status")
       }
 
-      const unverifiedOwnersList = await this.db.parkingAvenueOwner.findMany({
+      const ownersList = await this.db.parkingAvenueOwner.findMany({
         where: {
-          isVerified: getByApprovalStatus.approvalStatus
-        },          
+          isVerified: getByApprovalStatus.approvalStatus,
+          ...(cursor ? { id: { gt: cursor } } : {}),
+        },
+        orderBy: {
+            id: 'asc',
+          },
+        take: PAGE_SIZE + 1,          
         omit: {
             password: true,
           },
       });
 
-      return unverifiedOwnersList;
+      return this.paginate(ownersList);
 
     }
 

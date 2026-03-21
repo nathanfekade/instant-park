@@ -4,7 +4,7 @@ import { CreateParkingAvenueDto } from './dto/create-parking-avenue.dto';
 import { UpdateParkingAvenueDto } from './dto/update-parking-avenue.dto';
 import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiConsumes, ApiQuery } from '@nestjs/swagger';
 import { SearchParkingDto } from './dto/search-parking-avenue.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { GetReservationsDto } from './dto/get-reservations.dto';
@@ -89,8 +89,9 @@ export class ParkingAvenueController {
   @Get('list')
   @ApiOperation({ summary: 'Get all the parking avenue you own' })
   @ApiBearerAuth('JWT-auth')
-  getMyParkingAvenueList( @Req() req: RequestWithUser){
-    return this.parkingAvenueService.getMyParkingAvenueList(req.user.id);
+  @ApiQuery({ name: 'cursor', required: false, type: String }) 
+  getMyParkingAvenueList( @Req() req: RequestWithUser, @Query('cursor') cursor?: string){
+    return this.parkingAvenueService.getMyParkingAvenueList(req.user.id, cursor);
   }
 
   @UseGuards(JwtAuthGuard)

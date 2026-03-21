@@ -23,7 +23,7 @@ export class AdminController {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-   private parseCursor(cursor?: string): string | undefined {
+  private parseCursor(cursor?: string): string | undefined {
      if (!cursor) return undefined;
   
       if (cursor.length === 0) {
@@ -58,8 +58,9 @@ export class AdminController {
   @Get('ownerverificationstatus')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get parking avenue owners by approval status'})
-  parkingAvenueOwnerStatus(@Query() getByApprovalStatus: GetByApprovalStatus, @Req() req: RequestWithUser){
-    return this.adminService.parkingAvenueOwnerStatus(getByApprovalStatus, req.user.id)
+  @ApiQuery({ name: 'cursor', required: false, type: String }) 
+  parkingAvenueOwnerStatus(@Query() getByApprovalStatus: GetByApprovalStatus, @Req() req: RequestWithUser, @Query('cursor') cursor?: string){
+    return this.adminService.parkingAvenueOwnerStatus(getByApprovalStatus, req.user.id, cursor)
   }
 
   @UseGuards(JwtAuthGuard)
