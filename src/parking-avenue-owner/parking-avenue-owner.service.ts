@@ -9,6 +9,7 @@ import { Observable, fromEvent } from 'rxjs';
 import { filter, map } from 'rxjs/operators';
 import { LiveActivityEvent } from '../event/live-activity.event';
 import { EmailService } from 'src/email/email.service';
+const PAGE_SIZE = 10;
 
 @Injectable()
 export class ParkingAvenueOwnerService {
@@ -19,9 +20,18 @@ export class ParkingAvenueOwnerService {
     private readonly eventEmitter: EventEmitter2,
     private readonly  emailService: EmailService,
   ) {}
-  
-      async register(createParkingAvenueOwnerDto: CreateParkingAvenueOwnerDto) {
 
+    paginate(items: any[]) {
+      const hasMore = items.length > PAGE_SIZE;
+      const data = hasMore ? items.slice(0, PAGE_SIZE) : items;
+      const nextCursor = hasMore
+        ? data[data.length - 1].id
+        : null;
+
+        return { data, hasMore, nextCursor };
+    }
+  
+    async register(createParkingAvenueOwnerDto: CreateParkingAvenueOwnerDto) {
         
         if (!createParkingAvenueOwnerDto.password.length || createParkingAvenueOwnerDto.password.length < 8) {
           throw new BadRequestException(
@@ -194,4 +204,30 @@ async getLiveActivityStream(ownerId: string): Promise<Observable<MessageEvent>> 
 
     return { message: 'Password updated successfully' };
   }
+
+  async getWardensForOwner(ownerId: string, cursor?: string, limit: number = 10) {
+
+    const avenues = await this.db.parkingAvenue.findMany({
+      where: { ownerId },
+      select: { id: true },
+    });
+    const avenueIds = avenues.map((a) => a.id);
+
+    const wardens = await this.db.warden.findMany({
+      where: { parkingAvenueId: { in: avenueIds } },
+      take: limit + 1, 
+      cursor: cursor ? { id: cursor } : undefined,
+      orderBy: { createdAt: 'desc' }, 
+      include: { parkingAvenue: { select: { name: true } } },
+    });
+
+    const { data, hasMore, nextCursor } = this.paginate(wardens);
+
+    const totalCount = await this.db.warden.count({
+      where: { parkingAvenueId: { in: avenueIds } },
+    });
+
+    return { data, totalCount, hasMore, nextCursor };
+}
+
 }
