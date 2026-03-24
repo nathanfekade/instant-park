@@ -1,4 +1,4 @@
-import { IsString, IsEnum } from 'class-validator';
+import { IsString, IsEnum, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger'; 
 import { ApprovalStatus } from '@prisma/client';
 
@@ -17,4 +17,9 @@ export class UpdateApprovalStatus {
     })
     @IsEnum(ApprovalStatus)
     approvalStatus: ApprovalStatus;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    rejectionReason?: string;
 }

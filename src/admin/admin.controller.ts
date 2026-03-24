@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Patch, Sse, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Patch, Sse, Query, BadRequestException } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiQuery  } from '@nestjs/swagger';
 import type { RequestWithUser } from 'src/auth/express-request-with-user.interface';
 import { Observable, fromEvent } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -22,6 +22,15 @@ export class AdminController {
     private readonly adminService: AdminService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  private parseCursor(cursor?: string): string | undefined {
+     if (!cursor) return undefined;
+  
+      if (cursor.length === 0) {
+        throw new BadRequestException('cursor must be a valid string');
+      }
+      return cursor;
+  }
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new admin' })
@@ -49,8 +58,9 @@ export class AdminController {
   @Get('ownerverificationstatus')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get parking avenue owners by approval status'})
-  parkingAvenueOwnerStatus(@Query() getByApprovalStatus: GetByApprovalStatus, @Req() req: RequestWithUser){
-    return this.adminService.parkingAvenueOwnerStatus(getByApprovalStatus, req.user.id)
+  @ApiQuery({ name: 'cursor', required: false, type: String }) 
+  parkingAvenueOwnerStatus(@Query() getByApprovalStatus: GetByApprovalStatus, @Req() req: RequestWithUser, @Query('cursor') cursor?: string){
+    return this.adminService.parkingAvenueOwnerStatus(getByApprovalStatus, req.user.id, cursor)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -87,7 +97,8 @@ export class AdminController {
   @ApiOperation({ summary: 'Get parking avenue by approval status' })
   @Get('approvalstatus')
   @ApiBearerAuth('JWT-auth')
-  getByApprovalStatus(@Query() getByApprovalStatus: GetByApprovalStatus, @Req() req: RequestWithUser){
+  @ApiQuery({ name: 'cursor', required: false, type: String }) 
+  getByApprovalStatus(@Query() getByApprovalStatus: GetByApprovalStatus, @Req() req: RequestWithUser, @Query('cursor') cursor?: string){
     return this.adminService.getByApprovalStatus(getByApprovalStatus, req.user.id);
   }
 
@@ -107,7 +118,7 @@ export class AdminController {
 
 
   @UseGuards(JwtAuthGuard)
-  @Patch('update-approval-statuss')
+  @Patch('update-approval-status')
   @ApiOperation({ summary: 'update the approval status of a parking avenue' })
   @ApiBody({ type: UpdateApprovalStatus})
   @ApiBearerAuth('JWT-auth')
@@ -116,7 +127,22 @@ export class AdminController {
   }
 
   
+  @UseGuards(JwtAuthGuard)
+  @Get('avenueapprovalstatus')
+  @ApiOperation({ summary: 'Get parking avenues without approval status filter' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiQuery({ name: 'cursor', required: false, type: String }) 
+  getWithoutApprovalStatus(@Req() req: RequestWithUser, @Query('cursor') cursor?: string){
+    return this.adminService.getWithoutApprovalStatus(req.user.id, this.parseCursor(cursor),);
+  }
 
-
+  @UseGuards(JwtAuthGuard)
+  @Get('ownerapprovalStatus')
+  @ApiBearerAuth('JWT-auth')
+  @ApiQuery({ name: 'cursor', required: false, type: String }) 
+  @ApiOperation({ summary: 'Get parking avenue owners without approval status filter'})
+  parkingAvenueOwnerWithoutApprovalStatus(@Req() req: RequestWithUser, @Query('cursor') cursor?: string){
+    return this.adminService.parkingAvenueOwnerWithoutApprovalStatus(req.user.id, this.parseCursor(cursor))
+  }
 
 }

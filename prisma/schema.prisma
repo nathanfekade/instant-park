@@ -54,6 +54,7 @@ model ParkingAvenue {
   updatedAt           DateTime           @updatedAt
   reservations        Reservation[]
   approvalStatus      ApprovalStatus     @default(UNDERREVIEW)
+  rejectionReason     String?         
 
   checkIns            CheckIn[]
   warden              Warden[] 
@@ -96,6 +97,8 @@ model ParkingAvenueOwner {
   isVerified        ApprovalStatus  @default(UNDERREVIEW)
   parkingAvenues    ParkingAvenue[]
   personalId        String
+  rejectionReason   String?         
+
 }
 
 model Reservation {
