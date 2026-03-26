@@ -127,6 +127,7 @@ export class ParkingAvenueOwnerService {
     const parkingAvenueOwner = await this.db.parkingAvenueOwner.findUnique({
       where: { id },
       select: {
+        id: true,
         phoneNo: true,
         firstName: true,
         username: true,
