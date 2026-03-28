@@ -112,7 +112,8 @@ model ParkingAvenueOwner {
   isVerified        ApprovalStatus  @default(UNDERREVIEW)
   parkingAvenues    ParkingAvenue[]
   personalId        String
-  rejectionReason   String?         
+  rejectionReason   String?     
+  isCreatedByAdmin  Boolean         @default(false)
 
 }
 

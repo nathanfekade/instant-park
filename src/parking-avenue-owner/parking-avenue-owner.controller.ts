@@ -11,6 +11,7 @@ import { extname } from 'path';
 import { diskStorage } from 'multer';
 import * as fs from 'fs';
 import { Observable } from 'rxjs';
+import { ResendCredentialsDto } from './dto/resend-credentials-dto';
 
 const diskStorageConfig = diskStorage({
   destination: 'uploads',
@@ -94,8 +95,15 @@ export class ParkingAvenueOwnerController {
     return this.parkingAvenueOwnerService.getProfile(id);
   }
 
-@Sse('live-activity')
-  async streamLiveActivities(@Query('ownerId') ownerId: string): Promise<Observable<MessageEvent>> {
-    return this.parkingAvenueOwnerService.getLiveActivityStream(ownerId);
-  }
+    @Sse('live-activity')
+    async streamLiveActivities(@Query('ownerId') ownerId: string): Promise<Observable<MessageEvent>> {
+      return this.parkingAvenueOwnerService.getLiveActivityStream(ownerId);
+    }
+
+    @Post('resend-credentials')
+    @ApiBody({ type: ResendCredentialsDto })
+    @ApiOperation({ summary: 'Resend login credentials for new accounts' })
+    async resendCredentials(@Body('email') email: string) {
+      return this.parkingAvenueOwnerService.resendCredentials(email);
+    }
   }

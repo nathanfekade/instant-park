@@ -8,9 +8,11 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { JwtStrategy } from 'src/auth/guards/jwt.strategy';
 import { JwtModule } from '@nestjs/jwt';
 import { EmailModule } from 'src/email/email.module';
+import { ParkingAvenueOwnerModule } from 'src/parking-avenue-owner/parking-avenue-owner.module';
 
 @Module({
   imports: [
+    ParkingAvenueOwnerModule,
     EmailModule,
     DatabaseModule,
     PassportModule,

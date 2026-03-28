@@ -12,6 +12,8 @@ import { LiveActivityEvent } from '../event/live-activity.event';
 import { UpdateVerificationDto } from './dto/update-verification-dto';
 import { GetByApprovalStatus } from './dto/get-by-approval-status.dto';
 import { UpdateApprovalStatus } from './dto/update-approval-status.dto';
+import { CreateParkingAvenueOwnerDto } from 'src/parking-avenue-owner/dto/create-parking-avenue-owner.dto';
+import { ParkingAvenueOwnerService } from 'src/parking-avenue-owner/parking-avenue-owner.service';
 
 @Controller('admin')
 // TODO: role base access required
@@ -21,6 +23,7 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly parkingAvenueOwnerService: ParkingAvenueOwnerService,
   ) {}
 
   private parseCursor(cursor?: string): string | undefined {
@@ -143,6 +146,15 @@ export class AdminController {
   @ApiOperation({ summary: 'Get parking avenue owners without approval status filter'})
   parkingAvenueOwnerWithoutApprovalStatus(@Req() req: RequestWithUser, @Query('cursor') cursor?: string){
     return this.adminService.parkingAvenueOwnerWithoutApprovalStatus(req.user.id, this.parseCursor(cursor))
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('/register/parking-avenue-owner')
+  @ApiOperation({ summary: 'Admin creates parking avenue owner account'})
+  @ApiBearerAuth('JWT-auth')
+  @ApiBody({ type: CreateParkingAvenueOwnerDto })
+  async createOwner(@Body() dto: CreateParkingAvenueOwnerDto, @Req() req: RequestWithUser) {
+    return this.parkingAvenueOwnerService.createOwnerByAdmin(dto, req.user.id);
   }
 
 }
