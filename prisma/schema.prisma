@@ -113,6 +113,8 @@ model ParkingAvenueOwner {
   parkingAvenues    ParkingAvenue[]
   personalId        String
   rejectionReason   String?     
+  resetToken        String?
+  resetTokenExpiry  DateTime? 
   isCreatedByAdmin  Boolean         @default(false)
 
 }
@@ -124,10 +126,11 @@ model Reservation {
   endTime              DateTime
   durationHours        Int
   totalPrice           Float
-  status               String   @default("PENDING") // PENDING, CONFIRMED, CANCELLED
+  status               String   @default("PENDING") // PENDING, CONFIRMED, CANCELLED, FULLFILLED
   qrCode               String?
   transactionReference String?  @unique
   plateNumber          String   @unique
+  reminderSent         Boolean  @default(false)
 
   userId          String
   user            Customer      @relation(fields: [userId], references: [id])

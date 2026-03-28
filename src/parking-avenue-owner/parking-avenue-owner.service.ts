@@ -9,7 +9,10 @@ import { Observable, fromEvent } from 'rxjs';
 import { filter, map } from 'rxjs/operators';
 import { LiveActivityEvent } from '../event/live-activity.event';
 import { EmailService } from 'src/email/email.service';
+import { GetDashboardOverviewDto } from './dto/get-dashboard-overview.dto';
+import { GetTodayOccupancyChartDto } from './dto/get-today-occupancy-chart.dto';
 import { CreateParkingAvenueOwnerByAdminDto } from './dto/create-parking-avenue-owner-by-admin.dto';
+const PAGE_SIZE = 10;
 
 @Injectable()
 export class ParkingAvenueOwnerService {
@@ -18,12 +21,21 @@ export class ParkingAvenueOwnerService {
     private readonly db: DatabaseService, 
     private readonly jwtService: JwtService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly emailService: EmailService
-  
-  ) {}
-  
-      async register(createParkingAvenueOwnerDto: CreateParkingAvenueOwnerDto) {
+    private readonly  emailService: EmailService,
 
+  ) {}
+
+  paginate(items: any[]) {
+      const hasMore = items.length > PAGE_SIZE;
+      const data = hasMore ? items.slice(0, PAGE_SIZE) : items;
+      const nextCursor = hasMore
+        ? data[data.length - 1].id
+        : null;
+
+        return { data, hasMore, nextCursor };
+    }
+  
+    async register(createParkingAvenueOwnerDto: CreateParkingAvenueOwnerDto) {
         
         if (!createParkingAvenueOwnerDto.password.length || createParkingAvenueOwnerDto.password.length < 8) {
           throw new BadRequestException(
@@ -153,9 +165,174 @@ async getLiveActivityStream(ownerId: string): Promise<Observable<MessageEvent>> 
         } as MessageEvent;
       }),
     );
-  } 
-  
-  async createOwnerByAdmin(createParkingAvenueOwnerByAdminDto: CreateParkingAvenueOwnerByAdminDto, adminId: string) {
+  }  
+
+  async forgotPassword(email: string) {
+    const user = await this.db.parkingAvenueOwner.findUnique({ where: { email } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const token = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 15 * 60000);
+
+    await this.db.parkingAvenueOwner.update({
+      where: { id: user.id },
+      data: { resetToken: token, resetTokenExpiry: expiry },
+    });
+    
+    try {
+      await this.emailService.sendForgotPasswordEmail(email, user.firstName, token);
+      return "Sent email successfully."
+    }
+    catch(error){
+        console.error("Failed to send email", error);
+    }
+
+  }
+
+  async resetPassword(email: string, token: string, newPassword: string) {
+    const user = await this.db.parkingAvenueOwner.findUnique({ where: { email } });
+    
+    if (!user || user.resetToken !== token || new Date() > user.resetTokenExpiry!) {
+      throw new BadRequestException('Invalid or expired token');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    await this.db.parkingAvenueOwner.update({
+      where: { id: user.id },
+      data: { 
+        password: hashedPassword, 
+        resetToken: null, 
+        resetTokenExpiry: null 
+      },
+    });
+
+    return { message: 'Password updated successfully' };
+  }
+
+  async getWardensForOwner(ownerId: string, cursor?: string, limit: number = 10) {
+
+    const avenues = await this.db.parkingAvenue.findMany({
+      where: { ownerId },
+      select: { id: true },
+    });
+    const avenueIds = avenues.map((a) => a.id);
+
+    const wardens = await this.db.warden.findMany({
+      where: { parkingAvenueId: { in: avenueIds } },
+      take: limit + 1, 
+      cursor: cursor ? { id: cursor } : undefined,
+      orderBy: { createdAt: 'desc' }, 
+      include: { parkingAvenue: { select: { name: true } } },
+    });
+
+    const { data, hasMore, nextCursor } = this.paginate(wardens);
+
+    const totalCount = await this.db.warden.count({
+      where: { parkingAvenueId: { in: avenueIds } },
+    });
+
+    return { data, totalCount, hasMore, nextCursor };
+}
+async getDashboardOverview(ownerId: string): Promise<GetDashboardOverviewDto> {
+    const avenues = await this.db.parkingAvenue.findMany({
+      where: { ownerId: ownerId },
+      select: { id: true },
+    });
+
+    const avenueIds = avenues.map((ave) => ave.id);
+
+    if (avenueIds.length === 0) {
+      return {
+        totalSpots: 0,
+        availableSpotsNow: 0,
+        activeReservationsCount: 0,
+        onDutyWardenCount: 0,
+      };
+    }
+
+    const [parkingAvenueAggregates, activeReservations, onDutyWardens] = await this.db.$transaction([
+      this.db.parkingAvenue.aggregate({
+        where: { ownerId: ownerId },
+        _sum: {
+          totalSpots: true,
+          currentSpots: true,
+        },
+      }),
+
+      this.db.reservation.count({
+        where: {
+          parkingAvenueId: { in: avenueIds },
+          status: 'CONFIRMED',
+        },
+      }),
+
+      this.db.warden.count({
+        where: {
+          parkingAvenueId: { in: avenueIds },
+          wardenStatus: 'ONDUTY',
+        },
+      }),
+    ]);
+
+    return {
+      totalSpots: parkingAvenueAggregates._sum.totalSpots || 0,
+      availableSpotsNow: parkingAvenueAggregates._sum.currentSpots || 0,
+      activeReservationsCount: activeReservations,
+      onDutyWardenCount: onDutyWardens,
+    };
+  }
+
+  async getTodayOccupancyChartData(ownerId: string): Promise<GetTodayOccupancyChartDto> {
+    const avenues = await this.db.parkingAvenue.findMany({
+      where: { ownerId: ownerId },
+      select: { id: true },
+    });
+
+    const avenueIds = avenues.map((ave) => ave.id);
+
+    if (avenueIds.length === 0) {
+      return this.generateEmpty24HourArray();
+    }
+
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+    const occupancyLogsAggregated = await this.db.occupancyLog.groupBy({
+      by: ['hour'],
+      where: {
+        parkingAvenueId: { in: avenueIds },
+        timestamp: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+      _avg: {
+        occupancyRate: true,
+      },
+      orderBy: {
+        hour: 'asc',
+      },
+    });
+
+    const fullDayData: GetTodayOccupancyChartDto = this.generateEmpty24HourArray();
+
+    occupancyLogsAggregated.forEach((log) => {
+      fullDayData[log.hour].averageOccupancyRate = log._avg.occupancyRate || 0;
+    });
+
+    return fullDayData;
+  }
+
+  private generateEmpty24HourArray(): GetTodayOccupancyChartDto {
+    return Array.from({ length: 24 }, (_, i) => ({
+      hour: i,
+      averageOccupancyRate: 0,
+    }));
+  }
+
+   async createOwnerByAdmin(createParkingAvenueOwnerByAdminDto: CreateParkingAvenueOwnerByAdminDto, adminId: string) {
 
     const isAdmin = await this.db.admin.findUnique({
         where: {
@@ -246,4 +423,5 @@ async getLiveActivityStream(ownerId: string): Promise<Observable<MessageEvent>> 
     }
   return { message: 'Credentials have been resent to your email' };
 }
+
 }

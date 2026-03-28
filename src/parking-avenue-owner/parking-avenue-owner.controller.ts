@@ -3,7 +3,7 @@ import { ParkingAvenueOwnerService } from './parking-avenue-owner.service';
 import { CreateParkingAvenueOwnerDto } from './dto/create-parking-avenue-owner.dto';
 import { UpdateParkingAvenueOwnerDto } from './dto/update-parking-avenue-owner.dto';
 import { LoginParkingAvenueOwnerDto } from './dto/login-parking-avenue-owner.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiConsumes, ApiQuery } from '@nestjs/swagger';
 import type { RequestWithUser } from 'src/auth/express-request-with-user.interface';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -11,6 +11,10 @@ import { extname } from 'path';
 import { diskStorage } from 'multer';
 import * as fs from 'fs';
 import { Observable } from 'rxjs';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { GetDashboardOverviewDto } from './dto/get-dashboard-overview.dto';
+import { GetTodayOccupancyChartDto } from './dto/get-today-occupancy-chart.dto';
 import { ResendCredentialsDto } from './dto/resend-credentials-dto';
 
 const diskStorageConfig = diskStorage({
@@ -95,10 +99,43 @@ export class ParkingAvenueOwnerController {
     return this.parkingAvenueOwnerService.getProfile(id);
   }
 
-    @Sse('live-activity')
-    async streamLiveActivities(@Query('ownerId') ownerId: string): Promise<Observable<MessageEvent>> {
-      return this.parkingAvenueOwnerService.getLiveActivityStream(ownerId);
-    }
+@Sse('live-activity')
+  async streamLiveActivities(@Query('ownerId') ownerId: string): Promise<Observable<MessageEvent>> {
+    return this.parkingAvenueOwnerService.getLiveActivityStream(ownerId);
+  }
+
+  @Get('dashboard/overview')
+  async getDashboardOverview(@Req() req): Promise<GetDashboardOverviewDto> {
+    const ownerId = req.user.id;
+    return this.parkingAvenueOwnerService.getDashboardOverview(ownerId);
+  }
+
+  @Get('dashboard/today-occupancy-chart')
+  async getTodayOccupancyChartData(@Req() req): Promise<GetTodayOccupancyChartDto> {
+    const ownerId = req.user.id;
+    return this.parkingAvenueOwnerService.getTodayOccupancyChartData(ownerId);
+  }
+
+  @Post('forgot-password')
+  @ApiBody({ type: ForgotPasswordDto })
+  forgotPassword(@Body() forgotPasswordDto : ForgotPasswordDto){
+    return this.parkingAvenueOwnerService.forgotPassword(forgotPasswordDto.email)
+  }
+
+  @Post('reset-password')
+  @ApiBody({ type: ResetPasswordDto })
+    resetPassword(@Body() resetPasswordDto: ResetPasswordDto){
+    return this.parkingAvenueOwnerService.resetPassword(resetPasswordDto.email, resetPasswordDto.token, resetPasswordDto.newPassword)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('wardens')
+  @ApiOperation({ summary: 'Get list of all wardens for all my parking avenues' })
+  @ApiQuery({ name: 'cursor', required: false, type: String }) 
+  @ApiBearerAuth('JWT-auth')
+  async getMyWardens(@Req() req: RequestWithUser, @Query('cursor') cursor?: string,) {
+    return this.parkingAvenueOwnerService.getWardensForOwner(req.user.id);
+  }
 
     @Post('resend-credentials')
     @ApiBody({ type: ResendCredentialsDto })
@@ -106,4 +143,7 @@ export class ParkingAvenueOwnerController {
     async resendCredentials(@Body('email') email: string) {
       return this.parkingAvenueOwnerService.resendCredentials(email);
     }
+  
+
+
   }
