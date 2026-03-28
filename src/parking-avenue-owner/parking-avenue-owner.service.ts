@@ -11,6 +11,7 @@ import { LiveActivityEvent } from '../event/live-activity.event';
 import { EmailService } from 'src/email/email.service';
 import { GetDashboardOverviewDto } from './dto/get-dashboard-overview.dto';
 import { GetTodayOccupancyChartDto } from './dto/get-today-occupancy-chart.dto';
+import { CreateParkingAvenueOwnerByAdminDto } from './dto/create-parking-avenue-owner-by-admin.dto';
 const PAGE_SIZE = 10;
 
 @Injectable()
@@ -21,9 +22,10 @@ export class ParkingAvenueOwnerService {
     private readonly jwtService: JwtService,
     private readonly eventEmitter: EventEmitter2,
     private readonly  emailService: EmailService,
+
   ) {}
 
-    paginate(items: any[]) {
+  paginate(items: any[]) {
       const hasMore = items.length > PAGE_SIZE;
       const data = hasMore ? items.slice(0, PAGE_SIZE) : items;
       const nextCursor = hasMore
@@ -163,8 +165,8 @@ async getLiveActivityStream(ownerId: string): Promise<Observable<MessageEvent>> 
         } as MessageEvent;
       }),
     );
-  }
-  
+  }  
+
   async forgotPassword(email: string) {
     const user = await this.db.parkingAvenueOwner.findUnique({ where: { email } });
     if (!user) throw new NotFoundException('User not found');
@@ -329,4 +331,97 @@ async getDashboardOverview(ownerId: string): Promise<GetDashboardOverviewDto> {
       averageOccupancyRate: 0,
     }));
   }
+
+   async createOwnerByAdmin(createParkingAvenueOwnerByAdminDto: CreateParkingAvenueOwnerByAdminDto, adminId: string) {
+
+    const isAdmin = await this.db.admin.findUnique({
+        where: {
+          id: adminId
+        }
+      });
+
+      if(!isAdmin){
+        throw new UnauthorizedException("Only admin is allowed to view approval status")
+      }
+    const plainPassword = Math.random().toString(36).slice(-8) + 'A1!'; 
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+    const userCheck = await this.db.parkingAvenueOwner.findFirst({
+          where: {
+            OR: [
+                  { username: createParkingAvenueOwnerByAdminDto.username },
+                  { email: createParkingAvenueOwnerByAdminDto.email },
+                  { phoneNo: createParkingAvenueOwnerByAdminDto.phoneNo },
+              ]
+          }
+        });
+  
+    if (userCheck){
+      if(userCheck.email == createParkingAvenueOwnerByAdminDto.email ){
+        throw new ConflictException('email already exists');
+      }
+
+        if(userCheck.phoneNo == createParkingAvenueOwnerByAdminDto.phoneNo){
+            throw new ConflictException('phoneNo already exists');
+          }
+
+          if(userCheck.username == createParkingAvenueOwnerByAdminDto.username){
+            throw new ConflictException('username already exists');
+          }
+        }
+
+    const newOwner = await this.db.parkingAvenueOwner.create({
+      data: {
+        ...createParkingAvenueOwnerByAdminDto,
+        password: hashedPassword,
+        isCreatedByAdmin: true
+      },
+    });
+
+   
+    try {
+        await this.emailService.sendParkingAvenueOwnerCreatedEmail(
+          newOwner.email,
+          newOwner.firstName,
+          newOwner.username,
+          newOwner.password
+        );
+      } catch (error) {
+        console.error("Failed to send email", error);
+      }
+
+    return { message: 'Owner created successfully', username: createParkingAvenueOwnerByAdminDto.username, tempPassword: plainPassword };
+  }
+
+  async resendCredentials(email: string) {
+    const user = await this.db.parkingAvenueOwner.findUnique({ where: { email } });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    if (!user.isCreatedByAdmin) {
+      throw new BadRequestException('Account is already activated. Use "Forgot Password" instead.');
+    }
+
+    const newTempPassword = Math.random().toString(36).slice(-8) + 'A1!';
+    const hashedPassword = await bcrypt.hash(newTempPassword, 10);
+
+    await this.db.parkingAvenueOwner.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+
+    
+    try {
+      await this.emailService.sendParkingAvenueOwnerCreatedEmail(
+        email,
+        user.firstName,
+        user.username,
+        newTempPassword
+      );
+    } catch (error) {
+      console.error("Failed to send email", error);
+    }
+  return { message: 'Credentials have been resent to your email' };
+}
+
 }

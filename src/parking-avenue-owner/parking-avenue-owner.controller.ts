@@ -15,6 +15,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { GetDashboardOverviewDto } from './dto/get-dashboard-overview.dto';
 import { GetTodayOccupancyChartDto } from './dto/get-today-occupancy-chart.dto';
+import { ResendCredentialsDto } from './dto/resend-credentials-dto';
 
 const diskStorageConfig = diskStorage({
   destination: 'uploads',
@@ -98,7 +99,7 @@ export class ParkingAvenueOwnerController {
     return this.parkingAvenueOwnerService.getProfile(id);
   }
 
-  @Sse('live-activity')
+@Sse('live-activity')
   async streamLiveActivities(@Query('ownerId') ownerId: string): Promise<Observable<MessageEvent>> {
     return this.parkingAvenueOwnerService.getLiveActivityStream(ownerId);
   }
@@ -108,7 +109,7 @@ export class ParkingAvenueOwnerController {
     const ownerId = req.user.id;
     return this.parkingAvenueOwnerService.getDashboardOverview(ownerId);
   }
-  
+
   @Get('dashboard/today-occupancy-chart')
   async getTodayOccupancyChartData(@Req() req): Promise<GetTodayOccupancyChartDto> {
     const ownerId = req.user.id;
@@ -136,7 +137,13 @@ export class ParkingAvenueOwnerController {
     return this.parkingAvenueOwnerService.getWardensForOwner(req.user.id);
   }
 
-
-
+    @Post('resend-credentials')
+    @ApiBody({ type: ResendCredentialsDto })
+    @ApiOperation({ summary: 'Resend login credentials for new accounts' })
+    async resendCredentials(@Body('email') email: string) {
+      return this.parkingAvenueOwnerService.resendCredentials(email);
+    }
   
+
+
   }

@@ -112,9 +112,11 @@ model ParkingAvenueOwner {
   isVerified        ApprovalStatus  @default(UNDERREVIEW)
   parkingAvenues    ParkingAvenue[]
   personalId        String
-  rejectionReason   String?         
+  rejectionReason   String?     
   resetToken        String?
-  resetTokenExpiry  DateTime?
+  resetTokenExpiry  DateTime? 
+  isCreatedByAdmin  Boolean         @default(false)
+
 }
 
 model Reservation {

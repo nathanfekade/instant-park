@@ -32,5 +32,6 @@ import { EmailModule } from 'src/email/email.module';
     ],
   controllers: [ParkingAvenueOwnerController],
   providers: [ParkingAvenueOwnerService],
+  exports: [ParkingAvenueOwnerService]
 })
 export class ParkingAvenueOwnerModule {}

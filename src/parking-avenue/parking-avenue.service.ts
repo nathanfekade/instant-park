@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException, } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException, } from '@nestjs/common';
 import { CreateParkingAvenueDto } from './dto/create-parking-avenue.dto';
 import { UpdateParkingAvenueDto } from './dto/update-parking-avenue.dto';
 import { DatabaseService } from '../database/database.service';
@@ -17,6 +17,7 @@ import axios from 'axios';
 import { GetParkingAvenueDetailDto } from './dto/get-parking-avenue-detail.dto';
 import { CheckInService } from '../check-in/check-in.service';
 import { CreateCheckInDto } from 'src/check-in/dto/create-check-in.dto';
+import { CreateParkingAvenueByAdminDto } from './dto/create-parking-avenue-by-admin.dto';
 const PAGE_SIZE = 10;
 
 @Injectable()
@@ -612,6 +613,51 @@ async verifyPayment(bookingRef: string) {
     }
 
     return parkingAvenue;
+  }
+
+
+  async createParkingAvenueByAdmin(createParkingAvenueByAdminDto: CreateParkingAvenueByAdminDto, adminId : string) {
+
+    const isAdmin = await this.databaseService.admin.findUnique({
+            where: {
+              id: adminId
+            }
+          });
+    
+    if(!isAdmin){
+      throw new UnauthorizedException("Only admin is allowed to view approval status")
+    }
+
+    const owner = await this.databaseService.parkingAvenueOwner.findUnique({
+      where: { username: createParkingAvenueByAdminDto.username },
+    });
+
+    if (!owner) {
+      throw new NotFoundException('Parking avenue owner not found');
+    }
+
+    if (owner.isVerified !== ApprovalStatus.APPROVED) {
+      throw new BadRequestException("Owner must be verified to have a parking avenue registered");
+    }
+
+    const existing = await this.databaseService.parkingAvenue.findFirst({
+      where: {
+        OR: [{ name: createParkingAvenueByAdminDto.name }, { address: createParkingAvenueByAdminDto.address }]
+      }
+    });
+
+    if (existing) {
+      throw new ConflictException('Parking avenue with this name or address already exists');
+    }
+
+    const { username, ...parkingData } = createParkingAvenueByAdminDto;
+
+    return this.databaseService.parkingAvenue.create({
+      data: { 
+        ...parkingData, 
+        ownerId: owner.id 
+      },
+    });
   }
 
 }

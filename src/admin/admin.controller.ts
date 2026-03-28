@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Patch, Sse, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Patch, Sse, Query, BadRequestException, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiQuery  } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiQuery, ApiConsumes  } from '@nestjs/swagger';
 import type { RequestWithUser } from 'src/auth/express-request-with-user.interface';
 import { Observable, fromEvent } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -12,16 +12,43 @@ import { LiveActivityEvent } from '../event/live-activity.event';
 import { UpdateVerificationDto } from './dto/update-verification-dto';
 import { GetByApprovalStatus } from './dto/get-by-approval-status.dto';
 import { UpdateApprovalStatus } from './dto/update-approval-status.dto';
+import { CreateParkingAvenueOwnerDto } from 'src/parking-avenue-owner/dto/create-parking-avenue-owner.dto';
+import { ParkingAvenueOwnerService } from 'src/parking-avenue-owner/parking-avenue-owner.service';
+import { diskStorage } from 'multer';
+import * as fs from 'fs';
+import { extname } from 'path';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { CreateParkingAvenueOwnerByAdminDto } from 'src/parking-avenue-owner/dto/create-parking-avenue-owner-by-admin.dto';
+import { CreateParkingAvenueByAdminDto } from 'src/parking-avenue/dto/create-parking-avenue-by-admin.dto';
+import { ParkingAvenueService } from 'src/parking-avenue/parking-avenue.service';
+
+
+
+const diskStorageConfig = diskStorage({
+  destination: 'uploads',
+  filename: (req, file, callback) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = extname(file.originalname);
+    callback(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
+  },
+});
 
 @Controller('admin')
-// TODO: role base access required
-// @UseGuards(JwtAuthGuard, AdminGuard) 
-// @ApiBearerAuth('JWT-auth')
+
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly parkingAvenueService: ParkingAvenueService,
+    private readonly parkingAvenueOwnerService: ParkingAvenueOwnerService,
   ) {}
+
+  private cleanupFiles(personalId: string) {
+        
+      if (personalId && fs.existsSync(personalId)) {
+        fs.unlinkSync(personalId);
+      }
+  }
 
   private parseCursor(cursor?: string): string | undefined {
      if (!cursor) return undefined;
@@ -143,6 +170,83 @@ export class AdminController {
   @ApiOperation({ summary: 'Get parking avenue owners without approval status filter'})
   parkingAvenueOwnerWithoutApprovalStatus(@Req() req: RequestWithUser, @Query('cursor') cursor?: string){
     return this.adminService.parkingAvenueOwnerWithoutApprovalStatus(req.user.id, this.parseCursor(cursor))
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('personalId', { storage: diskStorageConfig }))
+  @Post('/register/parking-avenue-owner')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Admin creates parking avenue owner account'})
+  @ApiBearerAuth('JWT-auth')
+  @ApiBody({ type: CreateParkingAvenueOwnerByAdminDto })
+  async createOwner(
+    @Body() dto: CreateParkingAvenueOwnerByAdminDto, 
+    @Req() req: RequestWithUser,
+    @UploadedFile() personalId: Express.Multer.File,
+  ) {
+    if (!personalId) {
+        throw new BadRequestException('personalId is required');
+      }
+
+      if (personalId && personalId.size > 2 * 1024 * 1024) {
+        this.cleanupFiles(personalId.path);
+        throw new BadRequestException('Image must be smaller than 2MB');
+      }
+
+      if (!personalId.mimetype.match(/image\/(jpg|jpeg|png)/)) {
+        this.cleanupFiles(personalId.path);
+        throw new BadRequestException(
+          'Only image files (jpg, png, jpeg) are allowed',
+        );
+      }
+      dto.personalId = personalId.path;
+
+      try{
+          return this.parkingAvenueOwnerService.createOwnerByAdmin(dto, req.user.id);
+      } catch(error){
+        this.cleanupFiles(personalId.path);
+        throw error;
+      }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('/register/parking-avenue')
+  @UseInterceptors(FileInterceptor('legalDoc', { storage: diskStorageConfig }))
+  @ApiOperation({ summary: 'Admin creates parking avenue for parking avenue owner'})
+  @ApiBearerAuth('JWT-auth')
+  @ApiBody({ type: CreateParkingAvenueByAdminDto })
+  @ApiConsumes('multipart/form-data')
+  async createParkingAvenueByAdmin(
+    @Body() dto: CreateParkingAvenueByAdminDto, 
+    @UploadedFile() legalDoc: Express.Multer.File, 
+    @Req() req: RequestWithUser
+  ) {
+
+    if (!legalDoc) {
+        throw new BadRequestException('legalDoc is required');
+    }
+    
+    if (legalDoc && legalDoc.size > 2 * 1024 * 1024) {
+        this.cleanupFiles(legalDoc.path);
+        throw new BadRequestException('Image must be smaller than 2MB');
+      }
+
+    if (!legalDoc.mimetype.match(/image\/(jpg|jpeg|png)/)) {
+      this.cleanupFiles(legalDoc.path);
+      throw new BadRequestException(
+        'Only image files (jpg, png, jpeg) are allowed',
+      );
+    }
+
+    dto.legalDoc = legalDoc.path;
+
+    try{
+        return this.parkingAvenueService.createParkingAvenueByAdmin(dto, req.user.id);
+      } 
+    catch(error){
+      this.cleanupFiles(legalDoc.path);
+      throw error;
+    }
   }
 
 }

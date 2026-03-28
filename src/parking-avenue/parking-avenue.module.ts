@@ -10,5 +10,7 @@ import { PaymentService } from 'src/payment/payment.service';
   imports: [ DatabaseModule],
   controllers: [ParkingAvenueController],
   providers: [ParkingAvenueService, CheckInService, PaymentService],
+  exports: [ParkingAvenueService]
+
 })
 export class ParkingAvenueModule {}
