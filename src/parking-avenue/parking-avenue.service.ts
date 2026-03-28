@@ -15,6 +15,7 @@ import { CreateParkingAvenueImageDto } from './dto/create-parking-avenue-image.d
 import { GetMyParkingAvenueDetailDto } from './dto/get-my-parking-avenue-detail.dto';
 import axios from 'axios';
 import { GetParkingAvenueDetailDto } from './dto/get-parking-avenue-detail.dto';
+import { CreateParkingAvenueByAdminDto } from './dto/create-parking-avenue-by-admin.dto';
 const PAGE_SIZE = 10;
 
 @Injectable()
@@ -536,7 +537,7 @@ export class ParkingAvenueService {
   }
 
 
-  async createParkingAvenueByAdmin(createParkingAvenueDto: CreateParkingAvenueDto, username: string, adminId : string) {
+  async createParkingAvenueByAdmin(createParkingAvenueByAdminDto: CreateParkingAvenueByAdminDto, adminId : string) {
 
     const isAdmin = await this.databaseService.admin.findUnique({
             where: {
@@ -549,7 +550,7 @@ export class ParkingAvenueService {
     }
 
     const owner = await this.databaseService.parkingAvenueOwner.findUnique({
-      where: { username: username },
+      where: { username: createParkingAvenueByAdminDto.username },
     });
 
     if (!owner) {
@@ -562,7 +563,7 @@ export class ParkingAvenueService {
 
     const existing = await this.databaseService.parkingAvenue.findFirst({
       where: {
-        OR: [{ name: createParkingAvenueDto.name }, { address: createParkingAvenueDto.address }]
+        OR: [{ name: createParkingAvenueByAdminDto.name }, { address: createParkingAvenueByAdminDto.address }]
       }
     });
 
@@ -570,9 +571,11 @@ export class ParkingAvenueService {
       throw new ConflictException('Parking avenue with this name or address already exists');
     }
 
+    const { username, ...parkingData } = createParkingAvenueByAdminDto;
+
     return this.databaseService.parkingAvenue.create({
       data: { 
-        ...createParkingAvenueDto, 
+        ...parkingData, 
         ownerId: owner.id 
       },
     });

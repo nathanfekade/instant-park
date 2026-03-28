@@ -19,7 +19,8 @@ import * as fs from 'fs';
 import { extname } from 'path';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateParkingAvenueOwnerByAdminDto } from 'src/parking-avenue-owner/dto/create-parking-avenue-owner-by-admin.dto';
-
+import { CreateParkingAvenueByAdminDto } from 'src/parking-avenue/dto/create-parking-avenue-by-admin.dto';
+import { ParkingAvenueService } from 'src/parking-avenue/parking-avenue.service';
 
 
 
@@ -38,6 +39,7 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly parkingAvenueService: ParkingAvenueService,
     private readonly parkingAvenueOwnerService: ParkingAvenueOwnerService,
   ) {}
 
@@ -207,13 +209,44 @@ export class AdminController {
       }
   }
 
-  // @UseGuards(JwtAuthGuard)
-  // @Post('/register/parking-avenue')
-  // @ApiOperation({ summary: 'Admin creates parking avenue owner account'})
-  // @ApiBearerAuth('JWT-auth')
-  // @ApiBody({ type: CreateParkingAvenueOwnerDto })
-  // async createParkingAvenueByAdmin(@Body() dto: CreateParkingAvenueOwnerDto, @Req() req: RequestWithUser) {
-  //   return this.parkingAvenueOwnerService.createOwnerByAdmin(dto, req.user.id);
-  // }
+  @UseGuards(JwtAuthGuard)
+  @Post('/register/parking-avenue')
+  @UseInterceptors(FileInterceptor('legalDoc', { storage: diskStorageConfig }))
+  @ApiOperation({ summary: 'Admin creates parking avenue for parking avenue owner'})
+  @ApiBearerAuth('JWT-auth')
+  @ApiBody({ type: CreateParkingAvenueByAdminDto })
+  @ApiConsumes('multipart/form-data')
+  async createParkingAvenueByAdmin(
+    @Body() dto: CreateParkingAvenueByAdminDto, 
+    @UploadedFile() legalDoc: Express.Multer.File, 
+    @Req() req: RequestWithUser
+  ) {
+
+    if (!legalDoc) {
+        throw new BadRequestException('legalDoc is required');
+    }
+    
+    if (legalDoc && legalDoc.size > 2 * 1024 * 1024) {
+        this.cleanupFiles(legalDoc.path);
+        throw new BadRequestException('Image must be smaller than 2MB');
+      }
+
+    if (!legalDoc.mimetype.match(/image\/(jpg|jpeg|png)/)) {
+      this.cleanupFiles(legalDoc.path);
+      throw new BadRequestException(
+        'Only image files (jpg, png, jpeg) are allowed',
+      );
+    }
+
+    dto.legalDoc = legalDoc.path;
+
+    try{
+        return this.parkingAvenueService.createParkingAvenueByAdmin(dto, req.user.id);
+      } 
+    catch(error){
+      this.cleanupFiles(legalDoc.path);
+      throw error;
+    }
+  }
 
 }
