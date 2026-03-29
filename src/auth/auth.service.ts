@@ -15,6 +15,7 @@ import { DatabaseService } from '../database/database.service';
 import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
 import { LoginVerifyDto } from './dto/loginVerify.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 
 @Injectable()
@@ -297,6 +298,29 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
     return user;
+  }
+
+
+  async updateProfile(id: string, dto: UpdateProfileDto) {
+
+    if (dto.username) {
+      const existing = await this.db.customer.findFirst({
+        where: { 
+          username: dto.username,
+          NOT: { id } 
+        }
+      });
+      if (existing) throw new ConflictException('Username already taken');
+    }
+
+    try {
+      return await this.db.customer.update({
+        where: { id },
+        data: dto, 
+      });
+    } catch (error) {
+      throw new InternalServerErrorException('Failed to update profile');
+    }
   }
 
 
