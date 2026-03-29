@@ -11,6 +11,7 @@ import { LoginVerifyDto } from 'src/auth/dto/loginVerify.dto';
 import { GetMyParkingAvenueDetailDto } from 'src/parking-avenue/dto/get-my-parking-avenue-detail.dto';
 import { GetUsernameWardenDto } from './dto/get-username-warden.dto';
 import { GetPhoneNoWardenDto } from './dto/get-phoneno-warden.dto';
+import { ReassignWardenDto } from './dto/reassign-warden.dto';
 
 
 @Controller('warden')
@@ -109,6 +110,18 @@ export class WardenController {
   @ApiBearerAuth('JWT-auth')
   remove(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.wardenService.remove(id, req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBody({ type: ReassignWardenDto })
+  @ApiOperation({ summary: 'Reassign a warden to a different parking avenue' })
+  @ApiBearerAuth('JWT-auth')
+  @Patch('reassign/warden')
+  async reassign(
+    @Body() dto: ReassignWardenDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.wardenService.reassign(dto, req.user.id);
   }
 
 
