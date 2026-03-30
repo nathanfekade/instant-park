@@ -275,6 +275,7 @@ export class ParkingAvenueController {
   @Get('list')
   @ApiOperation({ summary: 'Get all parking avenues with optional filtering by type' })
   @ApiQuery({ name: 'type', enum: ParkingAvenueType, required: false })
+  @ApiBearerAuth('JWT-auth')
   async findAll(@Query() filterDto: FilterParkingDto) {
   return this.parkingAvenueService.findAll(filterDto);
   }

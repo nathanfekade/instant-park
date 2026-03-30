@@ -302,16 +302,11 @@ export class AuthService {
 
   async updateProfile(id: string, dto: UpdateProfileDto) {
 
-    const { phoneNo, ...updateData } = dto;
 
-    if (phoneNo) {
-      throw new BadRequestException('Phone number cannot be updated via this endpoint.');
-    }
-
-    if (updateData.username) {
+    if (dto.username) {
       const existing = await this.db.customer.findFirst({
         where: { 
-          username: updateData.username,
+          username: dto.username,
           NOT: { id } 
         }
       });
@@ -321,7 +316,7 @@ export class AuthService {
     try {
       return await this.db.customer.update({
         where: { id },
-        data: updateData, 
+        data: dto, 
       });
     } catch (error) {
       throw new InternalServerErrorException('Failed to update profile');

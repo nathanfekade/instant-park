@@ -74,7 +74,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('update-customer') 
-  @ApiOperation({ summary: 'Update customer profile' })
+  @ApiOperation({ summary: 'Update user profile' })
   @ApiBody({ type: UpdateProfileDto })
   @ApiBearerAuth('JWT-auth')
   async updateProfile(@Req() req: RequestWithUser, @Body() dto: UpdateProfileDto) 
