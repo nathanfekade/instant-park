@@ -14,6 +14,7 @@ export class IncidentReportController {
     @Post()
     @UseGuards(JwtAuthGuard)
     @ApiOperation({summary: 'Allow warden or customer to make an incident report'})
+    @ApiBearerAuth('JWT-auth')
     async reportIncident(
       @Req() req: RequestWithUser, 
       @Body() dto: CreateIncidentReportDto

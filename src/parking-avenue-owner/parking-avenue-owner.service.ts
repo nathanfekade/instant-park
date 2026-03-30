@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ConflictException, UnauthorizedException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, UnauthorizedException, NotFoundException, Logger, InternalServerErrorException } from '@nestjs/common';
 import { CreateParkingAvenueOwnerDto } from './dto/create-parking-avenue-owner.dto';
 import { UpdateParkingAvenueOwnerDto } from './dto/update-parking-avenue-owner.dto';
 import { JwtService } from '@nestjs/jwt';
@@ -12,6 +12,7 @@ import { EmailService } from 'src/email/email.service';
 import { GetDashboardOverviewDto } from './dto/get-dashboard-overview.dto';
 import { GetTodayOccupancyChartDto } from './dto/get-today-occupancy-chart.dto';
 import { CreateParkingAvenueOwnerByAdminDto } from './dto/create-parking-avenue-owner-by-admin.dto';
+import * as fs from 'fs';
 const PAGE_SIZE = 10;
 
 @Injectable()
@@ -423,5 +424,57 @@ async getDashboardOverview(ownerId: string): Promise<GetDashboardOverviewDto> {
     }
   return { message: 'Credentials have been resent to your email' };
 }
+
+
+  async updateProfile(id: string, dto: UpdateParkingAvenueOwnerDto) {
+
+    const existingOwner = await this.db.parkingAvenueOwner.findUnique({ where: { id } });
+
+    const updateData: any = { ...dto };
+
+    if (dto.password) {
+      updateData.password = await bcrypt.hash(dto.password, 10);
+    }
+
+     if (dto.personalId && existingOwner?.personalId) {
+        if (fs.existsSync(existingOwner.personalId)) {
+          fs.unlinkSync(existingOwner.personalId);
+        }
+      }
+
+    const conflicts = await this.db.parkingAvenueOwner.findFirst({
+      where: {
+        NOT: { id },
+        OR: [
+          { username: dto.username },
+          { email: dto.email },
+          { phoneNo: dto.phoneNo },
+        ],
+      },
+    });
+
+    if (conflicts) {
+      if (conflicts.username === dto.username) throw new ConflictException('Username taken');
+      if (conflicts.email === dto.email) throw new ConflictException('Email taken');
+      if (conflicts.phoneNo === dto.phoneNo) throw new ConflictException('Phone number taken');
+    }
+
+    try {
+      return await this.db.parkingAvenueOwner.update({
+        where: { id },
+        data: updateData,
+        select: { 
+          id: true,
+          firstName: true,
+          lastName: true,
+          username: true,
+          phoneNo: true,
+          email: true,
+        }
+      });
+    } catch (error) {
+      throw new InternalServerErrorException('Update failed');
+    }
+  }
 
 }

@@ -56,14 +56,6 @@ export class CreateWardenDto {
     wardenStatus: WardenStatus;
 
     @ApiProperty({
-        description: 'Warden location at the given time ',
-        example: 'GPS Coordinates',
-    })
-    @IsNotEmpty()
-    @IsString()
-    currentLocation: string;
-
-    @ApiProperty({
         description: 'Warden\'s primary residence.',
         example: 'Bole Bula',
     })

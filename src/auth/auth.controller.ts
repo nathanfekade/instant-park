@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Get, Req } from '@nestjs/common';
+import { Controller, Post, Patch , Body, UseGuards, Get, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -8,6 +8,7 @@ import type { Request } from 'express';
 import type { RequestWithUser } from './express-request-with-user.interface';
 import { VerifyDto } from './dto/verify.dto';
 import { LoginVerifyDto } from './dto/loginVerify.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 interface User {
   id: number;
@@ -69,6 +70,16 @@ export class AuthController {
   me(@Req() req: RequestWithUser) {
     const id = req.user.id;
     return this.auth.getProfile(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('update-customer') 
+  @ApiOperation({ summary: 'Update user profile' })
+  @ApiBody({ type: UpdateProfileDto })
+  @ApiBearerAuth('JWT-auth')
+  async updateProfile(@Req() req: RequestWithUser, @Body() dto: UpdateProfileDto) 
+  {
+    return this.auth.updateProfile(req.user.id, dto);
   }
 
 }
