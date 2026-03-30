@@ -11,6 +11,7 @@ import { LoginVerifyDto } from 'src/auth/dto/loginVerify.dto';
 import { GetUsernameWardenDto } from './dto/get-username-warden.dto';
 import { GetPhoneNoWardenDto } from './dto/get-phoneno-warden.dto';
 import { ReassignWardenDto } from './dto/reassign-warden.dto';
+import { ApprovalStatus } from '@prisma/client';
 
 
 @Injectable()
@@ -424,6 +425,10 @@ export class WardenService {
 
     if (!isAuthorized) {
       throw new BadRequestException('You do not own the target parking avenue or it does not exist');
+    }
+
+    if(isAuthorized.approvalStatus != ApprovalStatus.APPROVED){
+      throw new BadRequestException('Parking avenue has not been approved yet')
     }
 
     try {
