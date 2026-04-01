@@ -477,4 +477,152 @@ async getDashboardOverview(ownerId: string): Promise<GetDashboardOverviewDto> {
     }
   }
 
+  private async getOwnedAvenueIds(ownerId: string): Promise<string[]> {
+    const avenues = await this.db.parkingAvenue.findMany({
+      where: { ownerId },
+      select: { id: true },
+    });
+    return avenues.map(a => a.id);
+  }
+
+  async getAnalyticsKpis(ownerId: string) {
+    const avenueIds = await this.getOwnedAvenueIds(ownerId);
+    if (!avenueIds.length) return this.emptyKpis();
+
+    const checkInStats = await this.db.checkIn.aggregate({
+      where: { parkingAvenueId: { in: avenueIds }},
+      _count: { id: true },
+      _sum: { calculatedAmount: true },
+    });
+
+    // Calculates the difference between checkout (updatedAt) and checkin (createdAt) in hours
+    const durationQuery: any[] = await this.db.$queryRaw`
+      SELECT AVG(EXTRACT(EPOCH FROM ("updatedAt" - "createdAt")) / 3600) as "avgDuration"
+      FROM "CheckIn"
+      WHERE "parkingAvenueId" IN (${avenueIds.join("','")}) AND "status" = 'COMPLETED'
+    `;
+
+    const walkIns = await this.db.checkIn.count({
+      where: { parkingAvenueId: { in: avenueIds }, reservationId: null }
+    });
+    const reservations = await this.db.checkIn.count({
+      where: { parkingAvenueId: { in: avenueIds }, reservationId: { not: null } }
+    });
+
+    const avgOccupancy = await this.db.occupancyLog.aggregate({
+      where: { parkingAvenueId: { in: avenueIds } },
+      _avg: { occupancyRate: true }
+    });
+
+    return {
+      averageOccupancyRate: avgOccupancy._avg.occupancyRate || 0,
+      totalVisitors: checkInStats._count.id || 0,
+      averageStayDurationHours: durationQuery[0]?.avgDuration ? parseFloat(durationQuery[0].avgDuration) : 0,
+      totalRevenue: checkInStats._sum.calculatedAmount || 0,
+      visitorSplit: { reservations, walkIns }
+    };
+  }
+
+  async getOccupancyByDay(ownerId: string) {
+    const avenueIds = await this.getOwnedAvenueIds(ownerId);
+    if (!avenueIds.length) return [];
+
+    const grouped = await this.db.occupancyLog.groupBy({
+      by: ['dayOfWeek'],
+      where: { parkingAvenueId: { in: avenueIds } },
+      _avg: { occupancyRate: true },
+      orderBy: { dayOfWeek: 'asc' }
+    });
+
+    const daysMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    return grouped.map(item => ({
+      label: daysMap[item.dayOfWeek],
+      value: item._avg.occupancyRate || 0
+    }));
+  }
+
+  async getPeakHours(ownerId: string) {
+    const avenueIds = await this.getOwnedAvenueIds(ownerId);
+    if (!avenueIds.length) return [];
+
+    const grouped = await this.db.occupancyLog.groupBy({
+      by: ['hour'],
+      where: { parkingAvenueId: { in: avenueIds } },
+      _avg: { occupancyRate: true },
+      orderBy: { hour: 'asc' }
+    });
+
+    const fullDay = Array.from({ length: 24 }, (_, i) => ({ label: `${i}:00`, value: 0 }));
+    
+    grouped.forEach(item => {
+      fullDay[item.hour].value = item._avg.occupancyRate || 0;
+    });
+
+    return fullDay;
+  }
+
+  async getRevenueTrends(ownerId: string) {
+    const avenueIds = await this.getOwnedAvenueIds(ownerId);
+    if (!avenueIds.length) return [];
+
+    // Calculate the date 7 days ago
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    // Fetch all completed check-ins from the last 7 days
+    const recentCheckIns = await this.db.checkIn.findMany({
+      where: {
+        parkingAvenueId: { in: avenueIds },
+        status: 'COMPLETED',
+        createdAt: { gte: sevenDaysAgo }
+      },
+      select: {
+        createdAt: true,
+        calculatedAmount: true,
+        reservationId: true
+      }
+    });
+
+    // Group the data by date string (YYYY-MM-DD) in memory
+    const trendsMap = new Map<string, { resRev: number, walkRev: number }>();
+
+    // Initialize the last 7 days with 0 to ensure the graph doesn't have broken lines
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      trendsMap.set(d.toISOString().split('T')[0], { resRev: 0, walkRev: 0 });
+    }
+
+    // Populate the map with actual revenue
+    recentCheckIns.forEach(checkIn => {
+      const dateStr = checkIn.createdAt.toISOString().split('T')[0];
+      const amount = checkIn.calculatedAmount || 0;
+      const data = trendsMap.get(dateStr) || { resRev: 0, walkRev: 0 };
+
+      if (checkIn.reservationId) {
+        data.resRev += amount;
+      } else {
+        data.walkRev += amount;
+      }
+      trendsMap.set(dateStr, data);
+    });
+
+    // Format for the frontend chart (sorted chronologically)
+    return Array.from(trendsMap.entries())
+      .map(([date, revenues]) => ({
+        date,
+        reservationRevenue: revenues.resRev,
+        walkInRevenue: revenues.walkRev
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date)); // Sort oldest to newest
+  }
+
+  private emptyKpis() {
+    return {
+      averageOccupancyRate: 0, totalVisitors: 0, averageStayDurationHours: 0, totalRevenue: 0,
+      visitorSplit: { reservations: 0, walkIns: 0 }
+    };
+  }
 }

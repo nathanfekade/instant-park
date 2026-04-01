@@ -16,6 +16,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { GetDashboardOverviewDto } from './dto/get-dashboard-overview.dto';
 import { GetTodayOccupancyChartDto } from './dto/get-today-occupancy-chart.dto';
 import { ResendCredentialsDto } from './dto/resend-credentials-dto';
+import { AnalyticsKpiDto, ChartDataPointDto, RevenueTrendDto } from './dto/analytics.dto';
 
 const diskStorageConfig = diskStorage({
   destination: 'uploads',
@@ -176,7 +177,24 @@ export class ParkingAvenueOwnerController {
           }
 
     }
-  
 
+  @Get('kpis')
+  async getKpis(@Query('ownerId') ownerId: string): Promise<AnalyticsKpiDto> {
+    return this.parkingAvenueOwnerService.getAnalyticsKpis(ownerId);
+  }
 
+  @Get('occupancy-by-day')
+  async getOccupancyByDay(@Query('ownerId') ownerId: string): Promise<ChartDataPointDto[]> {
+    return this.parkingAvenueOwnerService.getOccupancyByDay(ownerId);
+  }
+
+  @Get('peak-hours')
+  async getPeakHours(@Query('ownerId') ownerId: string): Promise<ChartDataPointDto[]> {
+    return this.parkingAvenueOwnerService.getPeakHours(ownerId);
+  }
+
+  @Get('revenue-trends')
+  async getRevenueTrends(@Query('ownerId') ownerId: string): Promise<RevenueTrendDto[]> {
+    return this.parkingAvenueOwnerService.getRevenueTrends(ownerId);
+  }
   }

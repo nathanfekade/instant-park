@@ -12,4 +12,9 @@ export class CreateCheckInDto {
   @IsString()
   @IsOptional()
   userId?: string; 
+
+
+  @IsString()
+  @IsOptional()
+  reservationId?: string; 
 }
