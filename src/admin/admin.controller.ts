@@ -21,6 +21,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateParkingAvenueOwnerByAdminDto } from 'src/parking-avenue-owner/dto/create-parking-avenue-owner-by-admin.dto';
 import { CreateParkingAvenueByAdminDto } from 'src/parking-avenue/dto/create-parking-avenue-by-admin.dto';
 import { ParkingAvenueService } from 'src/parking-avenue/parking-avenue.service';
+import { AdminKpiDto, WeeklyUtilizationDto } from './dto/dashboard.dto';
 
 
 
@@ -249,4 +250,13 @@ export class AdminController {
     }
   }
 
+  @Get('kpis')
+  async getKpis(): Promise<AdminKpiDto> {
+    return this.adminService.getDashboardKpis();
+  }
+
+  @Get('weekly-utilization')
+  async getWeeklyUtilization(): Promise<WeeklyUtilizationDto[]> {
+    return this.adminService.getWeeklyUtilizationTrend();
+  }
 }
