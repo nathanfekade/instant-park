@@ -247,7 +247,7 @@ export class ParkingAvenueService {
     }
   }
 
-  async getReservationsByAvenue(parkingAvenueId: string, query: GetReservationsDto) {
+  async getReservationsByAvenue(parkingAvenueId: string, query: GetReservationsDto, wardenId: string) {
     const { page = 1, limit = 10 } = query;
     const skip = (page - 1) * limit;
 
@@ -256,6 +256,17 @@ export class ParkingAvenueService {
     });
     if (!avenue) {
       throw new NotFoundException(`Parking avenue #${parkingAvenueId} not found`);
+    }
+
+    const warden = await this.databaseService.warden.findFirst({
+      where: {
+        id: wardenId,
+        parkingAvenueId
+      }
+    })
+
+    if (!warden) {
+      throw new UnauthorizedException(`Access Denied`);
     }
 
     const [data, total] = await Promise.all([
@@ -363,6 +374,7 @@ async verifyPayment(bookingRef: string) {
     dto.licensePlate = reservation.plateNumber;
     dto.parkingAvenueId = reservation.parkingAvenueId;
     dto.userId = reservation.userId;
+    dto.reservationId = reservation.id;
     
     try {
       await this.checkInService.create(dto);

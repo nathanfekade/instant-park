@@ -18,7 +18,7 @@ export class CheckInService {
             where: { licensePlate: dto.licensePlate },
         });
 
-        if (existingCheckIn) {
+        if (existingCheckIn && existingCheckIn.status === 'ACTIVE') {
             throw new ConflictException('Vehicle is already checked in.');
         }
 
@@ -61,7 +61,9 @@ export class CheckInService {
                 data: {
                     licensePlate: dto.licensePlate,
                     parkingAvenueId: dto.parkingAvenueId,
-                    userId: dto.userId ?? null, //TODO: check if the user actually exists
+                    userId: dto.userId ?? null,
+                    reservationId: dto.reservationId ?? null,
+                    status: 'ACTIVE'
                 },
             });
         });
@@ -108,11 +110,12 @@ export class CheckInService {
                     select: {
                         hourlyRate: true,
                     }
-                }
+                },
+                reservation: true
             }
         });
 
-        if (!checkIn) {
+        if (!checkIn || checkIn.status !== 'ACTIVE') {
             throw new NotFoundException(`No active check-in found for plate: ${licensePlate}`);
         }
 
@@ -120,31 +123,62 @@ export class CheckInService {
         const entryTime = new Date(checkIn.createdAt);
         const diffInMs = now.getTime() - entryTime.getTime();
         const hoursStayed = Math.max(1, Math.ceil(diffInMs / (1000 * 60 * 60)));
-        const totalPrice = hoursStayed * checkIn.parkingAvenue.hourlyRate;
-        const tx_ref = `walkin-${licensePlate}-${Date.now()}`;
 
-        const paymentInit = await this.paymentService.initializeWalkInPayment(totalPrice, licensePlate, tx_ref);
+        let amountDue = 0;
 
-        return this.databaseService.$transaction(async (tx) => {
-            await tx.checkIn.delete({
+        // Prevent double-charging by checking reservation duration
+        if (checkIn.reservationId && checkIn.reservation) {
+            const reservedHours = checkIn.reservation.durationHours;
+            if (hoursStayed > reservedHours) {
+                const extraHours = hoursStayed - reservedHours;
+                amountDue = extraHours * checkIn.parkingAvenue.hourlyRate;
+            }
+        } else {
+            // Walk-in: Charge for the total time
+            amountDue = hoursStayed * checkIn.parkingAvenue.hourlyRate;
+        }
+
+        // Path A: User owes money (Walk-in or Overstayed Reservation)
+        if (amountDue > 0) {
+            const tx_ref = `chkout-${licensePlate}-${Date.now()}`;
+            const paymentInit = await this.paymentService.initializeWalkInPayment(amountDue, licensePlate, tx_ref);
+
+            await this.databaseService.checkIn.update({
                 where: { id: checkIn.id },
+                data: {
+                    status: 'PAYMENT_PENDING',
+                    calculatedAmount: amountDue,
+                    checkoutTxRef: tx_ref
+                }
+            });
+
+            return {
+                message: 'Payment required for check-out',
+                licensePlate,
+                hoursStayed,
+                amountDue,
+                checkoutUrl: paymentInit.checkout_url,
+            };
+        }
+
+        // Path B: User does not owe money (Reservation within time limit)
+        return this.databaseService.$transaction(async (tx) => {
+            await tx.checkIn.update({
+                where: { id: checkIn.id },
+                data: { status: 'COMPLETED', calculatedAmount: 0 },
             });
 
             const updatedAvenue = await tx.parkingAvenue.update({
                 where: { id: checkIn.parkingAvenueId },
-                data: {
-                    currentSpots: { increment: 1 },
-                },
+                data: { currentSpots: { increment: 1 } },
             });
 
             return {
-                message: 'Check-out successful',
+                message: 'Check-out successful. No additional payment required.',
                 licensePlate,
-                availableSpots: updatedAvenue.currentSpots,
-                totalPrice,
                 hoursStayed,
-                hourlyRate: checkIn.parkingAvenue.hourlyRate,
-                checkoutUrl: paymentInit.checkout_url,
+                amountDue: 0,
+                availableSpots: updatedAvenue.currentSpots,
             };
         });
     }

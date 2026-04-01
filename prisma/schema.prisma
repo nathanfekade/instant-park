@@ -141,6 +141,7 @@ model Reservation {
   user            Customer      @relation(fields: [userId], references: [id])
   parkingAvenueId String
   parkingAvenue   ParkingAvenue @relation(fields: [parkingAvenueId], references: [id])
+  checkIn         CheckIn?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -164,6 +165,11 @@ model CheckIn {
   parkingAvenue   ParkingAvenue @relation(fields: [parkingAvenueId], references: [id])
   userId          String?
   user            Customer?     @relation(fields: [userId], references: [id])
+  reservationId    String?       @unique
+  reservation      Reservation?  @relation(fields: [reservationId], references: [id])
+  status           String        @default("ACTIVE") // ACTIVE, PAYMENT_PENDING, COMPLETED
+  calculatedAmount Float?        @default(0)
+  checkoutTxRef    String?       @unique
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 }
