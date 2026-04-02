@@ -689,4 +689,98 @@ export class AdminService {
       parkingDistribution,
     };
   }
+
+
+  async getReservationDashboard(adminId: string) {
+
+    const isAdmin = await this.db.admin.findUnique({ where: { id: adminId } });
+      
+      if (!isAdmin) {
+        throw new UnauthorizedException("Only admin is allowed to view warden stats");
+      }
+
+    const now = new Date();
+
+    const activeReservations = await this.db.reservation.count({
+      where: {
+        status: 'CONFIRMED',
+        startTime: { lte: now },
+        endTime: { gte: now },
+      },
+    });
+
+    const upcomingReservations = await this.db.reservation.count({
+      where: {
+        status: 'CONFIRMED',
+        startTime: { gt: now },
+      },
+    });
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const revenueAggregation = await this.db.reservation.aggregate({
+      where: {
+        status: 'FULFILLED', 
+        startTime: {
+          gte: startOfDay,
+        },
+      },
+      _sum: {
+        totalPrice: true,
+      },
+    });
+
+    return {
+      activeReservations,
+      upcomingReservations,
+      todaysRevenue: revenueAggregation._sum.totalPrice || 0,
+    };
+  }
+
+  async getPeakDemandData(adminId: string) {
+
+    const isAdmin = await this.db.admin.findUnique({ where: { id: adminId } });
+      
+      if (!isAdmin) {
+        throw new UnauthorizedException("Only admin is allowed to view warden stats");
+      }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const reservations = await this.db.reservation.findMany({
+      where: {
+        createdAt: { gte: today },
+        status: { not: 'CANCELLED' },
+      },
+      select: {
+        startTime: true,
+      },
+    });
+
+    const demandMap: Record<number, number> = {};
+    for (let i = 6; i <= 22; i++) {
+      demandMap[i] = 0;
+    }
+
+    reservations.forEach((res) => {
+      const hour = res.startTime.getHours();
+      if (demandMap.hasOwnProperty(hour)) {
+        demandMap[hour]++;
+      }
+    });
+
+    return Object.entries(demandMap).map(([hour, count]) => ({
+      time: this.formatHourLabel(parseInt(hour)),
+      reservations: count,
+    }));
+  }
+
+  private formatHourLabel(hour: number): string {
+    if (hour === 12) return '12PM';
+    if (hour === 0) return '12AM';
+    return hour > 12 ? `${hour - 12}PM` : `${hour}AM`;
+  }
+
 }

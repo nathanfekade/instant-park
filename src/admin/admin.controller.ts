@@ -281,4 +281,21 @@ export class AdminController {
   async getDetailedAnalytics(): Promise<DetailedAnalyticsDto> {
     return this.adminService.getDetailedAnalytics();
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('reservation-dashboard')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'get reservation dashboard'})
+  getReservationDashboard(@Req() req: RequestWithUser){
+    return this.adminService.getReservationDashboard(req.user.id)
+  }
+
+
+  @UseGuards(JwtAuthGuard)
+  @Get('reservation-peak-demand')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'get reservation peak demand graph'})
+  getPeakDemandData(@Req() req: RequestWithUser){
+    return this.adminService.getPeakDemandData(req.user.id)
+  }
 }
