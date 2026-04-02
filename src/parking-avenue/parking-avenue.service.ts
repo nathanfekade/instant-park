@@ -42,7 +42,7 @@ export class ParkingAvenueService {
 
   private readonly AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
-  async create(createParkingAvenueDto: CreateParkingAvenueDto, userId: string) {
+  async create(createParkingAvenueDto: CreateParkingAvenueDto, userId: string, imagePath?: string) {
     const parkingAvenueOwnerCheck =
       await this.databaseService.parkingAvenueOwner.findUnique({
         where: { id: userId },
@@ -76,9 +76,23 @@ export class ParkingAvenueService {
       }
     }
 
-    return this.databaseService.parkingAvenue.create({
+    const createAvenue = await this.databaseService.parkingAvenue.create({
       data: { ...createParkingAvenueDto, ownerId: userId },
     });
+
+    if (imagePath) {
+      await this.databaseService.parkingAvenueImage.create(
+        {
+          data: {
+            parkingAvenueId: createAvenue.id,
+            photosUrl: imagePath
+          }
+        }
+      )
+    }
+
+
+    return createAvenue
   }
 
   async findNearby(searchDto: SearchParkingDto) {
@@ -591,7 +605,7 @@ export class ParkingAvenueService {
       throw new NotFoundException("This parking avenue does not exist");
     }
 
-    return this.databaseService.parkingAvenueImage.create(
+    return await this.databaseService.parkingAvenueImage.create(
       {
         data: createParkingAvenueImageDto
       }
