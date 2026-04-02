@@ -142,9 +142,9 @@ export class ParkingAvenueController {
     return this.parkingAvenueService.createReservation(createReservationDto, req.user.id);
   }
 
-  //@UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('reservations/avenue/:id')
-  //@ApiBearerAuth('JWT-auth')
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get paginated reservations for a parking lot' })
   @ApiResponse({ status: 200, description: 'List of reservations with pagination meta' })
   async getReservationsByAvenue(
@@ -152,9 +152,7 @@ export class ParkingAvenueController {
     @Query() query: GetReservationsDto,
     @Req() req: RequestWithUser
   ) {
-    // TODO: we need to make sure only a warden assigned to the provided parking avenue can access this information
-
-    return this.parkingAvenueService.getReservationsByAvenue(id, query);
+    return this.parkingAvenueService.getReservationsByAvenue(id, query, req.user.id);
   }
 
   //@UseGuards(JwtAuthGuard)

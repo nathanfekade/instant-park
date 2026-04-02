@@ -9,6 +9,7 @@ import { GetByApprovalStatus } from './dto/get-by-approval-status.dto';
 import { UpdateApprovalStatus } from './dto/update-approval-status.dto';
 import { UpdateVerificationDto } from './dto/update-verification-dto';
 import { EmailService } from 'src/email/email.service';
+import { AdminKpiDto, WeeklyUtilizationDto } from './dto/dashboard.dto';
 const PAGE_SIZE = 10;
 
 @Injectable()
@@ -480,4 +481,95 @@ export class AdminService {
   return this.paginate(ownersWithStats);
 }
 
+  async getDashboardKpis(): Promise<AdminKpiDto> {
+    const [wardensOnDuty, activeCheckIns, confirmedReservations, avenueStats] = await this.db.$transaction([
+      this.db.warden.count({
+        where: { wardenStatus: 'ONDUTY' },
+      }),
+
+      this.db.checkIn.count({
+        where: { status: 'ACTIVE' },
+      }),
+
+      this.db.reservation.count({
+        where: { status: 'CONFIRMED' },
+      }),
+
+      this.db.parkingAvenue.aggregate({
+        _sum: {
+          totalSpots: true,
+          currentSpots: true, 
+        },
+      }),
+    ]);
+
+    const totalSpots = avenueStats._sum.totalSpots || 0;
+    const availableSpots = avenueStats._sum.currentSpots || 0;
+    const occupiedSpots = totalSpots - availableSpots;
+    
+    const overallUtilizationRate = totalSpots > 0 
+      ? Math.round((occupiedSpots / totalSpots) * 100) 
+      : 0;
+
+    return {
+      wardensOnDuty,
+      activeCheckIns,
+      confirmedReservations,
+      overallUtilizationRate,
+    };
+  }
+
+  async getWeeklyUtilizationTrend(): Promise<WeeklyUtilizationDto[]> {
+    const rawData: any[] = await this.db.$queryRaw`
+      SELECT 
+        DATE(o."timestamp")::text as "date",
+        p."type" as "type",
+        AVG(o."occupancyRate") as "avgRate"
+      FROM "OccupancyLog" o
+      JOIN "ParkingAvenue" p ON o."parkingAvenueId" = p."id"
+      WHERE o."timestamp" >= NOW() - INTERVAL '7 days'
+      GROUP BY DATE(o."timestamp"), p."type"
+      ORDER BY "date" ASC
+    `;
+
+    const trendsMap = new Map<string, WeeklyUtilizationDto>();
+    
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      
+      trendsMap.set(dateStr, {
+        date: dateStr,
+        onStreetRate: 0,
+        offStreetRate: 0,
+        overallRate: 0,
+      });
+    }
+
+    rawData.forEach((row) => {
+      const dateStr = row.date;
+      const type = row.type;
+      const rate = parseFloat(row.avgRate) || 0;
+
+      if (trendsMap.has(dateStr)) {
+        const data = trendsMap.get(dateStr)!;
+        
+        if (type === 'ON_STREET') {
+          data.onStreetRate = Math.round(rate);
+        } else if (type === 'OFF_STREET') {
+          data.offStreetRate = Math.round(rate);
+        }
+      }
+    });
+
+    return Array.from(trendsMap.values()).map(day => {
+      if (day.onStreetRate > 0 && day.offStreetRate > 0) {
+        day.overallRate = Math.round((day.onStreetRate + day.offStreetRate) / 2);
+      } else {
+        day.overallRate = day.onStreetRate || day.offStreetRate;
+      }
+      return day;
+    });
+  }
 }
