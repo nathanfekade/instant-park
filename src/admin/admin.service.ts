@@ -9,7 +9,7 @@ import { GetByApprovalStatus } from './dto/get-by-approval-status.dto';
 import { UpdateApprovalStatus } from './dto/update-approval-status.dto';
 import { UpdateVerificationDto } from './dto/update-verification-dto';
 import { EmailService } from 'src/email/email.service';
-import { AdminKpiDto, WeeklyUtilizationDto } from './dto/dashboard.dto';
+import { AdminKpiDto, DetailedAnalyticsDto, WeeklyUtilizationDto } from './dto/dashboard.dto';
 const PAGE_SIZE = 10;
 
 @Injectable()
@@ -571,5 +571,122 @@ export class AdminService {
       }
       return day;
     });
+  }
+
+  async getDetailedAnalytics(): Promise<DetailedAnalyticsDto> {
+    const now = new Date();
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const [
+      avenueAggregates,
+      zoneStats,
+      peakHoursRaw,
+      parkingDistRaw,
+      currentMonthCheckInRev,
+      currentMonthResRev,
+      lastMonthCheckInRev,
+      lastMonthResRev
+    ] = await Promise.all([
+      // Overall Utilization
+      this.db.parkingAvenue.aggregate({
+        _sum: { totalSpots: true, currentSpots: true },
+      }),
+
+      // Zone Utilization (grouped by subCity)
+      this.db.parkingAvenue.groupBy({
+        by: ['subCity'],
+        _sum: { totalSpots: true, currentSpots: true },
+      }),
+
+      // Peak Hours
+      this.db.occupancyLog.groupBy({
+        by: ['hour'],
+        _avg: { occupancyRate: true },
+        orderBy: { hour: 'asc' },
+      }),
+
+      // Parking Distribution (ON_STREET vs OFF_STREET)
+      this.db.parkingAvenue.groupBy({
+        by: ['type'],
+        _count: { _all: true },
+      }),
+
+      // Revenue Data (Current Month)
+      this.db.checkIn.aggregate({
+        where: { status: 'COMPLETED', createdAt: { gte: startOfCurrentMonth } },
+        _sum: { calculatedAmount: true },
+      }),
+      this.db.reservation.aggregate({
+        where: { status: { in: ['CONFIRMED', 'FULFILLED'] }, createdAt: { gte: startOfCurrentMonth } },
+        _sum: { totalPrice: true },
+      }),
+
+      // Revenue Data (Last Month)
+      this.db.checkIn.aggregate({
+        where: { status: 'COMPLETED', createdAt: { gte: startOfLastMonth, lt: startOfCurrentMonth } },
+        _sum: { calculatedAmount: true },
+      }),
+      this.db.reservation.aggregate({
+        where: { status: { in: ['CONFIRMED', 'FULFILLED'] }, createdAt: { gte: startOfLastMonth, lt: startOfCurrentMonth } },
+        _sum: { totalPrice: true },
+      }),
+    ]);
+
+    const totalSpots = avenueAggregates._sum.totalSpots || 0;
+    const availableSpots = avenueAggregates._sum.currentSpots || 0;
+    const occupiedSpots = totalSpots - availableSpots;
+    const averageUtilization = totalSpots > 0 ? Math.round((occupiedSpots / totalSpots) * 100) : 0;
+
+    const currentRevenue = (currentMonthCheckInRev._sum.calculatedAmount || 0) + (currentMonthResRev._sum.totalPrice || 0);
+    const lastRevenue = (lastMonthCheckInRev._sum.calculatedAmount || 0) + (lastMonthResRev._sum.totalPrice || 0);
+    let revenueGrowth = 0;
+    if (lastRevenue > 0) {
+      revenueGrowth = Math.round(((currentRevenue - lastRevenue) / lastRevenue) * 100);
+    } else if (currentRevenue > 0) {
+      revenueGrowth = 100; 
+    }
+
+    const zoneUtilization = zoneStats.map(zone => {
+      const zTotal = zone._sum.totalSpots || 0;
+      const zAvailable = zone._sum.currentSpots || 0;
+      const zOccupied = zTotal - zAvailable;
+      const rate = zTotal > 0 ? Math.round((zOccupied / zTotal) * 100) : 0;
+      
+      return {
+        label: zone.subCity,
+        value: rate,
+      };
+    }).sort((a, b) => b.value - a.value); 
+
+    // Hottest Zone is the first /lement after sorting
+    const hottestZoneData = zoneUtilization.length > 0 
+      ? zoneUtilization[0] 
+      : { label: 'N/A', value: 0 };
+
+    const fullDay = Array.from({ length: 24 }, (_, i) => ({
+      label: i === 12 ? '12 PM' : i > 12 ? `${i - 12} PM` : i === 0 ? '12 AM' : `${i} AM`,
+      value: 0,
+    }));
+    peakHoursRaw.forEach(item => {
+      fullDay[item.hour].value = Math.round(item._avg.occupancyRate || 0);
+    });
+
+    const parkingDistribution = parkingDistRaw.map(dist => ({
+      label: dist.type === 'ON_STREET' ? 'On-Street' : 'Off-Street',
+      value: dist._count._all,
+    }));
+
+    return {
+      averageUtilization,
+      revenueGrowth,
+      hottestZone: {
+        subCity: hottestZoneData.label as string,
+        utilization: hottestZoneData.value,
+      },
+      zoneUtilization,
+      peakHours: fullDay,
+      parkingDistribution,
+    };
   }
 }

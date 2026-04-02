@@ -21,7 +21,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateParkingAvenueOwnerByAdminDto } from 'src/parking-avenue-owner/dto/create-parking-avenue-owner-by-admin.dto';
 import { CreateParkingAvenueByAdminDto } from 'src/parking-avenue/dto/create-parking-avenue-by-admin.dto';
 import { ParkingAvenueService } from 'src/parking-avenue/parking-avenue.service';
-import { AdminKpiDto, WeeklyUtilizationDto } from './dto/dashboard.dto';
+import { AdminKpiDto, DetailedAnalyticsDto, WeeklyUtilizationDto } from './dto/dashboard.dto';
 import { AiInsightService } from 'src/ai-analytics/ai-insight.service';
 import { WardenService } from 'src/warden/warden.service';
 
@@ -277,4 +277,8 @@ export class AdminController {
     return this.wardenService.getWardenStats(req.user.id, this.parseCursor(cursor))
   }
 
+  @Get('detailed-analytics')
+  async getDetailedAnalytics(): Promise<DetailedAnalyticsDto> {
+    return this.adminService.getDetailedAnalytics();
+  }
 }
