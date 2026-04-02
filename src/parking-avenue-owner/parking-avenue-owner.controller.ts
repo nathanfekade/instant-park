@@ -203,4 +203,12 @@ export class ParkingAvenueOwnerController {
   async getAiInsight(@Req() req) {
     return this.aiInsightService.generateProviderInsight(req.user.id);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('warden-status')
+  @ApiOperation({ summary: 'Get list of wardens by status' })
+  @ApiBearerAuth('JWT-auth')
+  async getWardenStatusReport(@Req() req: RequestWithUser) {
+    return this.parkingAvenueOwnerService.getWardenStatusReport(req.user.id);
+  }
 }

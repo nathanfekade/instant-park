@@ -13,6 +13,7 @@ import { GetDashboardOverviewDto } from './dto/get-dashboard-overview.dto';
 import { GetTodayOccupancyChartDto } from './dto/get-today-occupancy-chart.dto';
 import { CreateParkingAvenueOwnerByAdminDto } from './dto/create-parking-avenue-owner-by-admin.dto';
 import * as fs from 'fs';
+import { WardenStatus } from '@prisma/client';
 const PAGE_SIZE = 10;
 
 @Injectable()
@@ -625,4 +626,40 @@ async getDashboardOverview(ownerId: string): Promise<GetDashboardOverviewDto> {
       visitorSplit: { reservations: 0, walkIns: 0 }
     };
   }
+
+  async getWardenStatusReport(parkingAvenueOwnerId: string) {
+
+    const owner = await this.db.parkingAvenueOwner.findUnique({
+        where: { id: parkingAvenueOwnerId },
+      });
+
+      if (!owner) throw new NotFoundException('Only parking avenue owner is allowed');
+
+      const wardenStats = await this.db.warden.groupBy({
+        by: ['wardenStatus'],
+        _count: {
+          id: true,
+        },
+        where: {
+          parkingAvenue: {
+            ownerId: parkingAvenueOwnerId,
+          },
+        },
+      });
+
+      const result = {
+        onDuty: 0,
+        offDuty: 0,
+      };
+
+      wardenStats.forEach((stat) => {
+        if (stat.wardenStatus === WardenStatus.ONDUTY) {
+          result.onDuty = stat._count.id;
+        } else if (stat.wardenStatus === WardenStatus.OFFDUTY) {
+          result.offDuty = stat._count.id;
+        }
+      });
+
+      return result;
+    }
 }
