@@ -22,6 +22,7 @@ import { CreateParkingAvenueOwnerByAdminDto } from 'src/parking-avenue-owner/dto
 import { CreateParkingAvenueByAdminDto } from 'src/parking-avenue/dto/create-parking-avenue-by-admin.dto';
 import { ParkingAvenueService } from 'src/parking-avenue/parking-avenue.service';
 import { AdminKpiDto, WeeklyUtilizationDto } from './dto/dashboard.dto';
+import { AiInsightService } from 'src/ai-analytics/ai-insight.service';
 
 
 
@@ -42,6 +43,7 @@ export class AdminController {
     private readonly eventEmitter: EventEmitter2,
     private readonly parkingAvenueService: ParkingAvenueService,
     private readonly parkingAvenueOwnerService: ParkingAvenueOwnerService,
+    private readonly aiInsightService: AiInsightService
   ) {}
 
   private cleanupFiles(personalId: string) {
@@ -258,5 +260,10 @@ export class AdminController {
   @Get('weekly-utilization')
   async getWeeklyUtilization(): Promise<WeeklyUtilizationDto[]> {
     return this.adminService.getWeeklyUtilizationTrend();
+  }
+
+  @Get('ai-insight')
+  async getSystemAiInsight() {
+    return this.aiInsightService.generateAdminInsight();
   }
 }
