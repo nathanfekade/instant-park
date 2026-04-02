@@ -23,7 +23,7 @@ import { CreateParkingAvenueByAdminDto } from 'src/parking-avenue/dto/create-par
 import { ParkingAvenueService } from 'src/parking-avenue/parking-avenue.service';
 import { AdminKpiDto, WeeklyUtilizationDto } from './dto/dashboard.dto';
 import { AiInsightService } from 'src/ai-analytics/ai-insight.service';
-
+import { WardenService } from 'src/warden/warden.service';
 
 
 const diskStorageConfig = diskStorage({
@@ -43,7 +43,8 @@ export class AdminController {
     private readonly eventEmitter: EventEmitter2,
     private readonly parkingAvenueService: ParkingAvenueService,
     private readonly parkingAvenueOwnerService: ParkingAvenueOwnerService,
-    private readonly aiInsightService: AiInsightService
+    private readonly aiInsightService: AiInsightService,
+    private readonly wardenService: WardenService
   ) {}
 
   private cleanupFiles(personalId: string) {
@@ -266,4 +267,14 @@ export class AdminController {
   async getSystemAiInsight() {
     return this.aiInsightService.generateAdminInsight();
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('list-wardens')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'get stats for wardens by admin'})
+  @ApiQuery({ name: 'cursor', required: false, type: String }) 
+  getWardenList(@Req() req: RequestWithUser, @Query('cursor') cursor?: string){
+    return this.wardenService.getWardenStats(req.user.id, this.parseCursor(cursor))
+  }
+
 }

@@ -11,9 +11,11 @@ import { EmailModule } from 'src/email/email.module';
 import { ParkingAvenueOwnerModule } from 'src/parking-avenue-owner/parking-avenue-owner.module';
 import { ParkingAvenueModule } from 'src/parking-avenue/parking-avenue.module';
 import { AiInsightService } from 'src/ai-analytics/ai-insight.service';
+import { WardenModule } from 'src/warden/warden.module';
 
 @Module({
   imports: [
+    WardenModule,
     ParkingAvenueModule,
     ParkingAvenueOwnerModule,
     EmailModule,
