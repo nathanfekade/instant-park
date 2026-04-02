@@ -11,3 +11,20 @@ export class WeeklyUtilizationDto {
   offStreetRate: number;
   overallRate: number;
 }
+
+export class ChartDataPointDto {
+  label: string | number;
+  value: number;
+}
+
+export class DetailedAnalyticsDto {
+  averageUtilization: number;
+  revenueGrowth: number;
+  hottestZone: {
+    subCity: string;
+    utilization: number;
+  };
+  peakHours: ChartDataPointDto[];
+  zoneUtilization: ChartDataPointDto[];
+  parkingDistribution: ChartDataPointDto[];
+}
