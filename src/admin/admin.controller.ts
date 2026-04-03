@@ -294,7 +294,7 @@ export class AdminController {
   @UseGuards(JwtAuthGuard)
   @Get('reservation-peak-demand')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'get reservation peak demand graph'})
+  @ApiOperation({ summary: 'get reservation peak demand graph for admin'})
   getPeakDemandData(@Req() req: RequestWithUser){
     return this.adminService.getPeakDemandData(req.user.id)
   }
