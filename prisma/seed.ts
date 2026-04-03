@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt'; // Add this import
 
 
 const statuses = ["PENDING", "CONFIRMED", "CANCELLED", "FULFILLED"];
+const checkInStatuses = ["ACTIVE", "PAYMENT_PENDING", "COMPLETED"];
 
 const prisma = new PrismaClient();
 
@@ -66,7 +67,78 @@ const hashedPassword = await bcrypt.hash(plainPassword, saltRounds);
   // 4. Now run the reservation logic
   // Pass the generated IDs to ensure we have data to work with
   await seedReservations(10000, [customer], [avenue]); 
+
+  const allReservations = await prisma.reservation.findMany();
+
+  // 6. Seed Check-ins (Randomly Walk-in or Reservation)
+  await seedCheckIns(10000, [customer], [avenue], allReservations);
   console.log("Seeding finished!"); 
+
+}
+
+async function seedCheckIns(count: number, users: any[], avenues: any[], reservations: any[]) {
+    console.log(`Seeding ${count} check-ins...`);
+    let successCount = 0;
+
+    // Use a Set to keep track of used reservations since CheckIn.reservationId is UNIQUE
+    const usedReservationIds = new Set();
+    const currentYear = new Date().getFullYear();
+
+    for (let i = 0; i < count; i++) {
+        const randomAvenue = avenues[Math.floor(Math.random() * avenues.length)];
+        const randomUser = users[Math.floor(Math.random() * users.length)];
+        
+        // 1. Determine if this is a Reservation or Walk-in
+        const isReservation = Math.random() > 0.5 && reservations.length > 0;
+        
+        // --- FIX: DECLARE THE VARIABLE HERE ---
+        let reservationId: string | null = null;
+        let licensePlate: string;
+
+        if (isReservation) {
+            // Find a reservation that hasn't been used yet
+            const availableReservations = reservations.filter(r => !usedReservationIds.has(r.id));
+            
+            if (availableReservations.length > 0) {
+                const res = availableReservations[Math.floor(Math.random() * availableReservations.length)];
+                reservationId = res.id;
+                licensePlate = res.plateNumber; 
+                usedReservationIds.add(res.id);
+            } else {
+                // Fallback to walk-in if all reservations are used
+                licensePlate = `WALK-${faker.string.alphanumeric(7).toUpperCase()}`;
+            }
+        } else {
+            // Walk-in logic
+            licensePlate = `WALK-${faker.string.alphanumeric(7).toUpperCase()}`;
+        }
+
+        // 2. Generate a date within the CURRENT year so your chart isn't empty
+        const randomDate = faker.date.between({ 
+            from: `${currentYear}-01-01T00:00:00Z`, 
+            to: `${currentYear}-12-31T23:59:59Z` 
+        });
+
+        try {
+            await prisma.checkIn.create({
+                data: {
+                    licensePlate: licensePlate,
+                    parkingAvenueId: randomAvenue.id,
+                    userId: randomUser.id,
+                    reservationId: reservationId, // Now correctly defined
+                    status: "COMPLETED", // Force COMPLETED so it shows in revenue trends
+                    calculatedAmount: faker.number.float({ min: 20, max: 200, fractionDigits: 2 }),
+                    checkoutTxRef: faker.string.uuid(),
+                    createdAt: randomDate,
+                    updatedAt: randomDate
+                }
+            });
+            successCount++;
+        } catch (error) {
+            // console.error("Check-in failed:", error.message);
+        }
+    }
+    console.log(`Successfully seeded ${successCount} check-ins.`);
 }
 
 // Update the function signature to accept the data we just created
@@ -102,8 +174,9 @@ async function seedReservations(count: number, users: any[], avenues: any[]) {
     } catch (error) {
        console.error("Reservation creation failed:", error); 
     }
-     console.log(`Successfully seeded ${successCount} reservations.`);
   }
+     console.log(`Successfully seeded ${successCount} reservations.`);
+
 }
 
 async function seedOccupancyLogs(avenueId: string, count: number) {

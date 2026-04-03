@@ -195,8 +195,10 @@ export class ParkingAvenueOwnerController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @Get('occupancy-by-day')
-  async getOccupancyByDay(@Req() req: RequestWithUser): Promise<ChartDataPointDto[]> {
-    return this.parkingAvenueOwnerService.getOccupancyByDay(req.user.id);
+  async getOccupancyByDay(@Req() req: RequestWithUser) {
+    // return this.parkingAvenueOwnerService.getOccupancyByDay(req.user.id);
+    return this.parkingAvenueOwnerService.findAverageOccupancyByOwner(req.user.id);
+    
   }
 
   @UseGuards(JwtAuthGuard)
@@ -212,8 +214,10 @@ export class ParkingAvenueOwnerController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @Get('revenue-trends')
-  async getRevenueTrends(@Req() req: RequestWithUser): Promise<RevenueTrendDto[]> {
-    return this.parkingAvenueOwnerService.getRevenueTrends(req.user.id);
+  async getRevenueTrends(@Req() req: RequestWithUser){
+    // return this.parkingAvenueOwnerService.getRevenueTrends(req.user.id);
+    return this.parkingAvenueOwnerService.getMonthlyRevenueTrends(req.user.id);
+    
   }
 
   @UseGuards(JwtAuthGuard)
