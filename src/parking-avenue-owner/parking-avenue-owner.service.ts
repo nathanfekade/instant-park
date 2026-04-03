@@ -662,4 +662,56 @@ async getDashboardOverview(ownerId: string): Promise<GetDashboardOverviewDto> {
 
       return result;
     }
+
+
+    async getPeakDemandData(ownerId: string) {
+      
+      const myAvenues = await this.db.parkingAvenue.findMany({
+        where: { ownerId },
+        select: { id: true },
+      });
+
+      const avenueIds = myAvenues.map((a) => a.id);
+
+      if (avenueIds.length === 0) {
+        return []; 
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const reservations = await this.db.reservation.findMany({
+        where: {
+          createdAt: { gte: today },
+          status: { not: 'CANCELLED' },
+          parkingAvenueId: { in: avenueIds }, 
+        },
+        select: {
+          startTime: true,
+        },
+      });
+
+      const demandMap: Record<number, number> = {};
+      for (let i = 6; i <= 22; i++) {
+        demandMap[i] = 0;
+      }
+
+      reservations.forEach((res) => {
+        const hour = res.startTime.getHours();
+        if (demandMap.hasOwnProperty(hour)) {
+          demandMap[hour]++;
+        }
+      });
+
+      return Object.entries(demandMap).map(([hour, count]) => ({
+        time: this.formatHourLabel(parseInt(hour)),
+        reservations: count,
+      }));
+    }
+
+    private formatHourLabel(hour: number): string {
+      if (hour === 12) return '12PM';
+      if (hour === 0) return '12AM';
+      return hour > 12 ? `${hour - 12}PM` : `${hour}AM`;
+    }
 }

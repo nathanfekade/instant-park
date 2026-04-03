@@ -211,4 +211,12 @@ export class ParkingAvenueOwnerController {
   async getWardenStatusReport(@Req() req: RequestWithUser) {
     return this.parkingAvenueOwnerService.getWardenStatusReport(req.user.id);
   }
+
+  @UseGuards(JwtAuthGuard) 
+  @Get('owner/reservation-peak-demand')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'get reservation peak demand for owner' })
+  getOwnerPeakDemandData(@Req() req: RequestWithUser) {
+    return this.parkingAvenueOwnerService.getPeakDemandData(req.user.id);
+  }
 }
