@@ -23,7 +23,7 @@ export class DetailedAnalyticsDto {
     subCity: string;
     utilization: number;
   };
-  peakHours: ChartDataPointDto[];
+  peakHours: string;
   zoneUtilization: ChartDataPointDto[];
   parkingDistribution: ChartDataPointDto[];
 }
