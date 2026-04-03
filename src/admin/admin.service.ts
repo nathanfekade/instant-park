@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, BadRequestException, NotFoundException,UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { JwtService } from '@nestjs/jwt';
@@ -14,182 +14,182 @@ const PAGE_SIZE = 10;
 
 @Injectable()
 export class AdminService {
-  
-    constructor( 
-      private readonly db: DatabaseService, 
-      private readonly jwtService: JwtService, 
-      private readonly  emailService: EmailService,
-    ) {}
 
-    paginate(items: any[]) {
-      const hasMore = items.length > PAGE_SIZE;
-      const data = hasMore ? items.slice(0, PAGE_SIZE) : items;
-      const nextCursor = hasMore
-        ? data[data.length - 1].id
-        : null;
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
+  ) { }
 
-        return { data, hasMore, nextCursor };
+  paginate(items: any[]) {
+    const hasMore = items.length > PAGE_SIZE;
+    const data = hasMore ? items.slice(0, PAGE_SIZE) : items;
+    const nextCursor = hasMore
+      ? data[data.length - 1].id
+      : null;
+
+    return { data, hasMore, nextCursor };
+  }
+
+  async register(createAdminDto: CreateAdminDto) {
+    if (!createAdminDto.password.length || createAdminDto.password.length < 8) {
+      throw new BadRequestException(
+        'Password must be at least 8 characters long',
+      );
     }
 
-    async register(createAdminDto: CreateAdminDto) {
-      if (!createAdminDto.password.length || createAdminDto.password.length < 8) {
-        throw new BadRequestException(
-          'Password must be at least 8 characters long',
-        );
-      }
+    const userCheck = await this.db.admin.findUnique({
+      where: { username: createAdminDto.username },
+    });
 
-      const userCheck = await this.db.admin.findUnique({
-        where: { username: createAdminDto.username },
-      });
-
-      if (userCheck){
-        throw new ConflictException('Username already exists');
-      }
-
-      const hashedPassword = await bcrypt.hash(createAdminDto.password, 10);
-      const registeredUser = await this.db.admin.create({
-        data: {
-          username: createAdminDto.username,
-          password: hashedPassword,
-        },
-      });
-
-        
-      return {
-        admin: {
-          username: createAdminDto.username,
-        },
-        message: 'Registration successful',
-      };
+    if (userCheck) {
+      throw new ConflictException('Username already exists');
     }
 
-    async login(updateAdminDto: UpdateAdminDto) {
+    const hashedPassword = await bcrypt.hash(createAdminDto.password, 10);
+    const registeredUser = await this.db.admin.create({
+      data: {
+        username: createAdminDto.username,
+        password: hashedPassword,
+      },
+    });
 
-      if (!updateAdminDto.username) {
-        throw new BadRequestException('Enter username to login');
-      }
-      if (!updateAdminDto.password) {
-        throw new BadRequestException('Password is required');
-      }
 
-      const user = await this.db.admin.findUnique({ where: { username: updateAdminDto.username! } });
-      
-      if (updateAdminDto.username && !user) {
-        throw new NotFoundException('Invalid username credentials');
-      }
-  
-      const isPasswordMatch = await bcrypt.compare(updateAdminDto.password, user!.password);
+    return {
+      admin: {
+        username: createAdminDto.username,
+      },
+      message: 'Registration successful',
+    };
+  }
 
-      if (!isPasswordMatch) {
-        throw new UnauthorizedException('Invalid password credentials');
-      }
+  async login(updateAdminDto: UpdateAdminDto) {
 
-      await this.db.admin.update({
-          where: {
-              id: user!.id,
-          },
-          data: {
-              lastLogin: new Date(),
-          },
-      });
-
-      const payload = {
-        sub: user!.id,
-      };
-      const accessToken = this.jwtService.sign(payload);
-
-      return { accessToken };
+    if (!updateAdminDto.username) {
+      throw new BadRequestException('Enter username to login');
+    }
+    if (!updateAdminDto.password) {
+      throw new BadRequestException('Password is required');
     }
 
-    async parkingAvenueOwnerStatus(getByApprovalStatus: GetByApprovalStatus, adminId: string, cursor?: string) {
+    const user = await this.db.admin.findUnique({ where: { username: updateAdminDto.username! } });
 
-      const isAdmin = await this.db.admin.findUnique({
-        where: {
-          id: adminId
-        }
-      });
-
-      if(!isAdmin){
-        throw new UnauthorizedException("Only admin is allowed to view approval status")
-      }
-
-      const ownersList = await this.db.parkingAvenueOwner.findMany({
-        cursor: cursor ? { id: cursor } : undefined,
-        skip: cursor ? 1 : 0, 
-        where: {
-          isVerified: getByApprovalStatus.approvalStatus,
-        },
-        orderBy: [
-            { createdAt: 'desc' }, 
-            { id: 'asc' } 
-          ],
-        take: PAGE_SIZE + 1,          
-        omit: {
-            password: true,
-          },
-      });
-
-      return this.paginate(ownersList);
-
+    if (updateAdminDto.username && !user) {
+      throw new NotFoundException('Invalid username credentials');
     }
 
-    async updateVerificationStatus(updateVerificationDto: UpdateVerificationDto, adminId: string){
-      
-      const isAdmin = await this.db.admin.findUnique({
-        where: {
-          id: adminId
-        }
-      });
+    const isPasswordMatch = await bcrypt.compare(updateAdminDto.password, user!.password);
 
-      if(!isAdmin){
-        throw new UnauthorizedException("Only admin can perform this action.")
-      }
-      
-      if (updateVerificationDto.approvalStatus === 'REJECTED' && !updateVerificationDto.rejectionReason) {
-        throw new BadRequestException("Rejection reason is required when rejecting an owner.");
-      }
-
-      const owner = await this.db.parkingAvenueOwner.findUnique({
-        where: { username: updateVerificationDto.username }
-      });
-
-      if (!owner) throw new NotFoundException("Owner not found");
-
-      const updateStatus = await this.db.parkingAvenueOwner.update({
-        where: {
-          username: updateVerificationDto.username,
-        },
-        data: {
-          isVerified: updateVerificationDto.approvalStatus,
-          rejectionReason: updateVerificationDto.approvalStatus === 'APPROVED' 
-            ? null : updateVerificationDto.rejectionReason,
-        },
-        omit: {
-          password: true
-        }
-      });
-
-      if(updateVerificationDto.approvalStatus ==="APPROVED"){
-        updateVerificationDto.rejectionReason = '';
-      }
-
-      try {
-        await this.emailService.sendVerificationEmail(
-          owner.email,
-          owner.firstName,
-          updateVerificationDto.approvalStatus,
-          `Your parking avenue owner account status has been updated to`,
-          updateVerificationDto.rejectionReason
-        );
-      } catch (error) {
-        console.error("Failed to send email", error);
-      }
-
-      return updateStatus
-      
+    if (!isPasswordMatch) {
+      throw new UnauthorizedException('Invalid password credentials');
     }
 
-    async getDashboardStats() {
+    await this.db.admin.update({
+      where: {
+        id: user!.id,
+      },
+      data: {
+        lastLogin: new Date(),
+      },
+    });
+
+    const payload = {
+      sub: user!.id,
+    };
+    const accessToken = this.jwtService.sign(payload);
+
+    return { accessToken };
+  }
+
+  async parkingAvenueOwnerStatus(getByApprovalStatus: GetByApprovalStatus, adminId: string, cursor?: string) {
+
+    const isAdmin = await this.db.admin.findUnique({
+      where: {
+        id: adminId
+      }
+    });
+
+    if (!isAdmin) {
+      throw new UnauthorizedException("Only admin is allowed to view approval status")
+    }
+
+    const ownersList = await this.db.parkingAvenueOwner.findMany({
+      cursor: cursor ? { id: cursor } : undefined,
+      skip: cursor ? 1 : 0,
+      where: {
+        isVerified: getByApprovalStatus.approvalStatus,
+      },
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'asc' }
+      ],
+      take: PAGE_SIZE + 1,
+      omit: {
+        password: true,
+      },
+    });
+
+    return this.paginate(ownersList);
+
+  }
+
+  async updateVerificationStatus(updateVerificationDto: UpdateVerificationDto, adminId: string) {
+
+    const isAdmin = await this.db.admin.findUnique({
+      where: {
+        id: adminId
+      }
+    });
+
+    if (!isAdmin) {
+      throw new UnauthorizedException("Only admin can perform this action.")
+    }
+
+    if (updateVerificationDto.approvalStatus === 'REJECTED' && !updateVerificationDto.rejectionReason) {
+      throw new BadRequestException("Rejection reason is required when rejecting an owner.");
+    }
+
+    const owner = await this.db.parkingAvenueOwner.findUnique({
+      where: { username: updateVerificationDto.username }
+    });
+
+    if (!owner) throw new NotFoundException("Owner not found");
+
+    const updateStatus = await this.db.parkingAvenueOwner.update({
+      where: {
+        username: updateVerificationDto.username,
+      },
+      data: {
+        isVerified: updateVerificationDto.approvalStatus,
+        rejectionReason: updateVerificationDto.approvalStatus === 'APPROVED'
+          ? null : updateVerificationDto.rejectionReason,
+      },
+      omit: {
+        password: true
+      }
+    });
+
+    if (updateVerificationDto.approvalStatus === "APPROVED") {
+      updateVerificationDto.rejectionReason = '';
+    }
+
+    try {
+      await this.emailService.sendVerificationEmail(
+        owner.email,
+        owner.firstName,
+        updateVerificationDto.approvalStatus,
+        `Your parking avenue owner account status has been updated to`,
+        updateVerificationDto.rejectionReason
+      );
+    } catch (error) {
+      console.error("Failed to send email", error);
+    }
+
+    return updateStatus
+
+  }
+
+  async getDashboardStats() {
     const [
       totalProviders,
       activeLocations,
@@ -203,10 +203,10 @@ export class AdminService {
       this.db.parkingAvenueOwner.count(),
       this.db.parkingAvenue.count(),
       this.db.parkingAvenue.count({
-        where: {type: ParkingAvenueType.ON_STREET }, 
+        where: { type: ParkingAvenueType.ON_STREET },
       }),
       this.db.parkingAvenue.count({
-        where: {type: ParkingAvenueType.OFF_STREET }, 
+        where: { type: ParkingAvenueType.OFF_STREET },
       }),
       this.db.customer.count(),
       this.db.reservation.count({
@@ -233,7 +233,7 @@ export class AdminService {
   }
 
 
-  async getByApprovalStatus(getByApprovalStatus: GetByApprovalStatus, adminId: string, cursor?: string){
+  async getByApprovalStatus(getByApprovalStatus: GetByApprovalStatus, adminId: string, cursor?: string) {
 
     const checkAdminId = await this.db.admin.findUnique(
       {
@@ -243,21 +243,21 @@ export class AdminService {
       }
     );
 
-    if(!checkAdminId){
+    if (!checkAdminId) {
       throw new NotFoundException("Only admin is allowed to view approval status")
     }
 
     const parkingAvenuesByStatus = await this.db.parkingAvenue.findMany(
       {
         cursor: cursor ? { id: cursor } : undefined,
-        skip: cursor ? 1 : 0, 
+        skip: cursor ? 1 : 0,
         where: {
           approvalStatus: getByApprovalStatus.approvalStatus,
         },
         orderBy: [
-            { createdAt: 'desc' }, 
-            { id: 'asc' } 
-          ],
+          { createdAt: 'desc' },
+          { id: 'asc' }
+        ],
         take: PAGE_SIZE + 1
       }
     );
@@ -266,7 +266,7 @@ export class AdminService {
 
   }
 
-  async updateApprovalStatus(updateApprovalStatus: UpdateApprovalStatus, adminId: string){
+  async updateApprovalStatus(updateApprovalStatus: UpdateApprovalStatus, adminId: string) {
 
     const checkAdminId = await this.db.admin.findUnique(
       {
@@ -276,12 +276,12 @@ export class AdminService {
       }
     );
 
-    if(!checkAdminId){
+    if (!checkAdminId) {
       throw new NotFoundException("Only admin can perform this action,")
     }
 
-    if(updateApprovalStatus.approvalStatus === 'REJECTED' && !updateApprovalStatus.rejectionReason){
-        throw new BadRequestException("Rejection reason is required when rejecting parking avenue.");
+    if (updateApprovalStatus.approvalStatus === 'REJECTED' && !updateApprovalStatus.rejectionReason) {
+      throw new BadRequestException("Rejection reason is required when rejecting parking avenue.");
     }
 
     const parkingAvenue = await this.db.parkingAvenue.findUnique(
@@ -289,13 +289,13 @@ export class AdminService {
         where: {
           id: updateApprovalStatus.id
         },
-        include : {
+        include: {
           owner: true
         }
       }
     );
 
-    if(!parkingAvenue){
+    if (!parkingAvenue) {
       throw new NotFoundException('Parking avenue with this id does not exist')
     }
 
@@ -306,15 +306,15 @@ export class AdminService {
         },
         data: {
           approvalStatus: updateApprovalStatus.approvalStatus,
-          rejectionReason: updateApprovalStatus.approvalStatus === 'APPROVED'?
+          rejectionReason: updateApprovalStatus.approvalStatus === 'APPROVED' ?
             null : updateApprovalStatus.rejectionReason,
         }
       }
     );
 
-    if(updateApprovalStatus.approvalStatus ==="APPROVED"){
-        updateApprovalStatus.rejectionReason = '';
-      }
+    if (updateApprovalStatus.approvalStatus === "APPROVED") {
+      updateApprovalStatus.rejectionReason = '';
+    }
 
     try {
       await this.emailService.sendVerificationEmail(
@@ -324,9 +324,9 @@ export class AdminService {
         `Your parking avenue status has been updated to`,
         updateApprovalStatus.rejectionReason
       );
-  } catch (error) {
-    console.error("Failed to send approval email", error);
-  }
+    } catch (error) {
+      console.error("Failed to send approval email", error);
+    }
 
     return updateStatus
   }
@@ -342,41 +342,41 @@ export class AdminService {
       }
     );
 
-    if(!checkAdminId){
+    if (!checkAdminId) {
       throw new NotFoundException("Only admin is allowed to view this overview")
     }
 
     const [totalProviders, activeLocations, onStreetLots, offStreetLots] = await this.db.$transaction([
       this.db.parkingAvenueOwner.count(),
 
-    this.db.parkingAvenue.count({
-      where: { status: 'OPEN' }
-    }),
+      this.db.parkingAvenue.count({
+        where: { status: 'OPEN' }
+      }),
 
-    this.db.parkingAvenue.count({
-      where: { type: 'ON_STREET' }
-    }),
+      this.db.parkingAvenue.count({
+        where: { type: 'ON_STREET' }
+      }),
 
-    this.db.parkingAvenue.count({
-      where: { type: 'OFF_STREET' }
-    })
-  ]);
+      this.db.parkingAvenue.count({
+        where: { type: 'OFF_STREET' }
+      })
+    ]);
 
-  return {
-    totalProviders,
-    activeLocations,
-    onStreetLots,
-    offStreetLots,
-  };
-}
+    return {
+      totalProviders,
+      activeLocations,
+      onStreetLots,
+      offStreetLots,
+    };
+  }
 
   async getParkingLotsStatus() {
 
-        
+
     const parkingLots = await this.db.parkingAvenue.findMany({
       select: {
         name: true,
-        address: true, 
+        address: true,
         latitude: true,
         longitude: true,
         totalSpots: true,
@@ -389,10 +389,10 @@ export class AdminService {
 
       if (lot.currentSpots >= lot.totalSpots) {
         status = 'FULL';
-      } 
+      }
       else if (lot.currentSpots >= lot.totalSpots * 0.8) {
         status = 'HIGH_DEMAND';
-      } 
+      }
       else {
         status = 'AVAILABLE';
       }
@@ -409,77 +409,77 @@ export class AdminService {
     });
   }
 
-  async getWithoutApprovalStatus(adminId: string, cursor?: string){
+  async getWithoutApprovalStatus(adminId: string, cursor?: string) {
 
-      const checkAdminId = await this.db.admin.findUnique(
-        {
-          where: {
-            id: adminId
-          }
+    const checkAdminId = await this.db.admin.findUnique(
+      {
+        where: {
+          id: adminId
         }
-      );
-
-      if(!checkAdminId){
-        throw new NotFoundException("Only admin is allowed to view approval status")
       }
+    );
 
-      const parkingAvenues = await this.db.parkingAvenue.findMany(
-        {
-          cursor: cursor ? { id: cursor } : undefined,
-          skip: cursor ? 1 : 0, 
-          orderBy: [
-            { createdAt: 'desc' }, 
-            { id: 'asc' } 
-          ],
-          take: PAGE_SIZE + 1
-        }
-      );
+    if (!checkAdminId) {
+      throw new NotFoundException("Only admin is allowed to view approval status")
+    }
 
-      return this.paginate(parkingAvenues);
+    const parkingAvenues = await this.db.parkingAvenue.findMany(
+      {
+        cursor: cursor ? { id: cursor } : undefined,
+        skip: cursor ? 1 : 0,
+        orderBy: [
+          { createdAt: 'desc' },
+          { id: 'asc' }
+        ],
+        take: PAGE_SIZE + 1
+      }
+    );
+
+    return this.paginate(parkingAvenues);
 
   }
-  
+
 
   async parkingAvenueOwnerWithoutApprovalStatus(adminId: string, cursor?: string) {
-      const isAdmin = await this.db.admin.findUnique({ where: { id: adminId } });
+    const isAdmin = await this.db.admin.findUnique({ where: { id: adminId } });
 
-      if (!isAdmin) {
-        throw new UnauthorizedException("Only admin is allowed to view approval status");
-      }
+    if (!isAdmin) {
+      throw new UnauthorizedException("Only admin is allowed to view approval status");
+    }
 
-      const unverifiedOwnersList = await this.db.parkingAvenueOwner.findMany({
-        cursor: cursor ? { id: cursor } : undefined,
-        skip: cursor ? 1 : 0, 
-        orderBy: [
-          { createdAt: 'desc' }, 
-          { id: 'asc' } 
-        ],
-        omit: { password: true },
-        take: PAGE_SIZE + 1,
-        include: {
-          parkingAvenues: {
-            select: {
-              totalSpots: true,
-            },
+    const unverifiedOwnersList = await this.db.parkingAvenueOwner.findMany({
+      cursor: cursor ? { id: cursor } : undefined,
+      skip: cursor ? 1 : 0,
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'asc' }
+      ],
+      omit: { password: true },
+      take: PAGE_SIZE + 1,
+      include: {
+        parkingAvenues: {
+          select: {
+            totalSpots: true,
           },
         },
-      });
+      },
+    });
 
-      const ownersWithStats = unverifiedOwnersList.map((owner) => {
-        const totalLocations = owner.parkingAvenues.length;
-        const totalSpaces = owner.parkingAvenues.reduce((acc, curr) => acc + curr.totalSpots, 0);
+    const ownersWithStats = unverifiedOwnersList.map((owner) => {
+      const totalLocations = owner.parkingAvenues.length;
+      const totalSpaces = owner.parkingAvenues.reduce((acc, curr) => acc + curr.totalSpots, 0);
 
-        const { parkingAvenues, ...ownerData } = owner;
+      const { parkingAvenues, ...ownerData } = owner;
 
-        return {
-          ...ownerData,
-          totalLocations,
-          totalSpaces,
-        };
-      });
+      return {
+        ...ownerData,
+        totalLocations,
+        totalSpaces,
+      };
+    });
 
-  return this.paginate(ownersWithStats);
-}
+    return this.paginate(ownersWithStats);
+  }
 
   async getDashboardKpis(): Promise<AdminKpiDto> {
     const [wardensOnDuty, activeCheckIns, confirmedReservations, avenueStats] = await this.db.$transaction([
@@ -498,7 +498,7 @@ export class AdminService {
       this.db.parkingAvenue.aggregate({
         _sum: {
           totalSpots: true,
-          currentSpots: true, 
+          currentSpots: true,
         },
       }),
     ]);
@@ -506,9 +506,9 @@ export class AdminService {
     const totalSpots = avenueStats._sum.totalSpots || 0;
     const availableSpots = avenueStats._sum.currentSpots || 0;
     const occupiedSpots = totalSpots - availableSpots;
-    
-    const overallUtilizationRate = totalSpots > 0 
-      ? Math.round((occupiedSpots / totalSpots) * 100) 
+
+    const overallUtilizationRate = totalSpots > 0
+      ? Math.round((occupiedSpots / totalSpots) * 100)
       : 0;
 
     return {
@@ -533,17 +533,18 @@ export class AdminService {
     `;
 
     const trendsMap = new Map<string, WeeklyUtilizationDto>();
-    
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0]; // Format: YYYY-MM-DD
-      
+      const dayName = dayNames[d.getDay()];
+
       trendsMap.set(dateStr, {
-        date: dateStr,
-        onStreetRate: 0,
-        offStreetRate: 0,
-        overallRate: 0,
+        day: dayName,
+        onStreet: 0,
+        offStreet: 0,
       });
     }
 
@@ -554,23 +555,16 @@ export class AdminService {
 
       if (trendsMap.has(dateStr)) {
         const data = trendsMap.get(dateStr)!;
-        
+
         if (type === 'ON_STREET') {
-          data.onStreetRate = Math.round(rate);
+          data.onStreet = Math.round(rate);
         } else if (type === 'OFF_STREET') {
-          data.offStreetRate = Math.round(rate);
+          data.offStreet = Math.round(rate);
         }
       }
     });
 
-    return Array.from(trendsMap.values()).map(day => {
-      if (day.onStreetRate > 0 && day.offStreetRate > 0) {
-        day.overallRate = Math.round((day.onStreetRate + day.offStreetRate) / 2);
-      } else {
-        day.overallRate = day.onStreetRate || day.offStreetRate;
-      }
-      return day;
-    });
+    return Array.from(trendsMap.values());
   }
 
   async getDetailedAnalytics(): Promise<DetailedAnalyticsDto> {
@@ -644,7 +638,7 @@ export class AdminService {
     if (lastRevenue > 0) {
       revenueGrowth = Math.round(((currentRevenue - lastRevenue) / lastRevenue) * 100);
     } else if (currentRevenue > 0) {
-      revenueGrowth = 100; 
+      revenueGrowth = 100;
     }
 
     const zoneUtilization = zoneStats.map(zone => {
@@ -652,16 +646,16 @@ export class AdminService {
       const zAvailable = zone._sum.currentSpots || 0;
       const zOccupied = zTotal - zAvailable;
       const rate = zTotal > 0 ? Math.round((zOccupied / zTotal) * 100) : 0;
-      
+
       return {
         label: zone.subCity,
         value: rate,
       };
-    }).sort((a, b) => b.value - a.value); 
+    }).sort((a, b) => b.value - a.value);
 
     // Hottest Zone is the first /lement after sorting
-    const hottestZoneData = zoneUtilization.length > 0 
-      ? zoneUtilization[0] 
+    const hottestZoneData = zoneUtilization.length > 0
+      ? zoneUtilization[0]
       : { label: 'N/A', value: 0 };
 
     const fullDay = Array.from({ length: 24 }, (_, i) => ({
@@ -694,10 +688,10 @@ export class AdminService {
   async getReservationDashboard(adminId: string) {
 
     const isAdmin = await this.db.admin.findUnique({ where: { id: adminId } });
-      
-      if (!isAdmin) {
-        throw new UnauthorizedException("Only admin is allowed to view warden stats");
-      }
+
+    if (!isAdmin) {
+      throw new UnauthorizedException("Only admin is allowed to view warden stats");
+    }
 
     const now = new Date();
 
@@ -721,7 +715,7 @@ export class AdminService {
 
     const revenueAggregation = await this.db.reservation.aggregate({
       where: {
-        status: 'FULFILLED', 
+        status: 'FULFILLED',
         startTime: {
           gte: startOfDay,
         },
@@ -741,10 +735,10 @@ export class AdminService {
   async getPeakDemandData(adminId: string) {
 
     const isAdmin = await this.db.admin.findUnique({ where: { id: adminId } });
-      
-      if (!isAdmin) {
-        throw new UnauthorizedException("Only admin is allowed to view warden stats");
-      }
+
+    if (!isAdmin) {
+      throw new UnauthorizedException("Only admin is allowed to view warden stats");
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);

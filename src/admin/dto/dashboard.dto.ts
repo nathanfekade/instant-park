@@ -6,10 +6,9 @@ export class AdminKpiDto {
 }
 
 export class WeeklyUtilizationDto {
-  date: string;
-  onStreetRate: number;
-  offStreetRate: number;
-  overallRate: number;
+  day: string;
+  onStreet: number;
+  offStreet: number;
 }
 
 export class ChartDataPointDto {
