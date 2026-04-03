@@ -27,7 +27,7 @@ export class AiInsightService {
       }
 
       const avenueIds = avenues.map(a => a.id);
-      
+
       const activeCheckIns = await this.databaseService.checkIn.count({
         where: { parkingAvenueId: { in: avenueIds }, status: 'ACTIVE' },
       });
@@ -37,10 +37,10 @@ export class AiInsightService {
       });
 
       const todayRevenue = await this.databaseService.checkIn.aggregate({
-        where: { 
-          parkingAvenueId: { in: avenueIds }, 
+        where: {
+          parkingAvenueId: { in: avenueIds },
           status: 'COMPLETED',
-          createdAt: { gte: new Date(new Date().setHours(0,0,0,0)) } 
+          createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) }
         },
         _sum: { calculatedAmount: true },
       });
@@ -65,9 +65,9 @@ export class AiInsightService {
         Format: Use short paragraphs or 2-3 bullet points. Do not include a generic introduction or greeting. Focus immediately on the analysis and 1 or 2 recommendations (e.g., dynamic pricing, space allocation, predicting peak hours). Maximum 150 words.
       `;
 
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
       const result = await model.generateContent(prompt);
-      
+
       return { insight: result.response.text().trim() };
 
     } catch (error) {
@@ -106,9 +106,9 @@ export class AiInsightService {
         Format: Use short paragraphs or 2-3 bullet points. Focus on system health, resource allocation (e.g., are there enough wardens for the current occupancy?), and overall utilization trends. Maximum 150 words. No pleasantries.
       `;
 
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
       const result = await model.generateContent(prompt);
-      
+
       return { insight: result.response.text().trim() };
 
     } catch (error) {
