@@ -101,19 +101,25 @@ export class ParkingAvenueOwnerController {
     return this.parkingAvenueOwnerService.getProfile(id);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Sse('live-activity')
-  async streamLiveActivities(@Query('ownerId') ownerId: string): Promise<Observable<MessageEvent>> {
-    return this.parkingAvenueOwnerService.getLiveActivityStream(ownerId);
+  async streamLiveActivities(@Req() req: RequestWithUser): Promise<Observable<MessageEvent>> {
+    return this.parkingAvenueOwnerService.getLiveActivityStream(req.user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Get('dashboard/overview')
-  async getDashboardOverview(@Query('ownerId') ownerId: string): Promise<GetDashboardOverviewDto> {
-    return this.parkingAvenueOwnerService.getDashboardOverview(ownerId);
+  async getDashboardOverview(@Req() req: RequestWithUser): Promise<GetDashboardOverviewDto> {
+    return this.parkingAvenueOwnerService.getDashboardOverview(req.user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Get('dashboard/today-occupancy-chart')
-  async getTodayOccupancyChartData(@Query('ownerId') ownerId: string): Promise<GetTodayOccupancyChartDto> {
-    return this.parkingAvenueOwnerService.getTodayOccupancyChartData(ownerId);
+  async getTodayOccupancyChartData(@Req() req: RequestWithUser): Promise<GetTodayOccupancyChartDto> {
+    return this.parkingAvenueOwnerService.getTodayOccupancyChartData(req.user.id);
   }
 
   @Post('forgot-password')
@@ -179,28 +185,38 @@ export class ParkingAvenueOwnerController {
 
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Get('kpis')
-  async getKpis(@Query('ownerId') ownerId: string): Promise<AnalyticsKpiDto> {
-    return this.parkingAvenueOwnerService.getAnalyticsKpis(ownerId);
+  async getKpis(@Req() req: RequestWithUser): Promise<AnalyticsKpiDto> {
+    return this.parkingAvenueOwnerService.getAnalyticsKpis(req.user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Get('occupancy-by-day')
-  async getOccupancyByDay(@Query('ownerId') ownerId: string): Promise<ChartDataPointDto[]> {
-    return this.parkingAvenueOwnerService.getOccupancyByDay(ownerId);
+  async getOccupancyByDay(@Req() req: RequestWithUser): Promise<ChartDataPointDto[]> {
+    return this.parkingAvenueOwnerService.getOccupancyByDay(req.user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Get('peak-hours')
-  async getPeakHours(@Query('ownerId') ownerId: string): Promise<ChartDataPointDto[]> {
-    return this.parkingAvenueOwnerService.getPeakHours(ownerId);
+  async getPeakHours(@Req() req: RequestWithUser): Promise<ChartDataPointDto[]> {
+    return this.parkingAvenueOwnerService.getPeakHours(req.user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Get('revenue-trends')
-  async getRevenueTrends(@Query('ownerId') ownerId: string): Promise<RevenueTrendDto[]> {
-    return this.parkingAvenueOwnerService.getRevenueTrends(ownerId);
+  async getRevenueTrends(@Req() req: RequestWithUser): Promise<RevenueTrendDto[]> {
+    return this.parkingAvenueOwnerService.getRevenueTrends(req.user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Get('ai-insight')
-  async getAiInsight(@Req() req) {
+  async getAiInsight(@Req() req: RequestWithUser) {
     return this.aiInsightService.generateProviderInsight(req.user.id);
   }
 
