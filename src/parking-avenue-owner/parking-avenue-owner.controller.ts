@@ -202,8 +202,11 @@ export class ParkingAvenueOwnerController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @Get('peak-hours')
-  async getPeakHours(@Req() req: RequestWithUser): Promise<ChartDataPointDto[]> {
-    return this.parkingAvenueOwnerService.getPeakHours(req.user.id);
+  async getPeakHours(@Req() req: RequestWithUser) {
+    // return this.parkingAvenueOwnerService.getPeakHours(req.user.id);
+    
+    return this.parkingAvenueOwnerService.getAverageOccupancyByOwner(req.user.id);
+
   }
 
   @UseGuards(JwtAuthGuard)

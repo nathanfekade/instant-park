@@ -59,9 +59,13 @@ const hashedPassword = await bcrypt.hash(plainPassword, saltRounds);
     }
   });
 
+  // 4. Seed Occupancy Logs (NEW)
+  // Call this BEFORE or AFTER reservations, doesn't matter
+  await seedOccupancyLogs(avenue.id, 10000); 
+
   // 4. Now run the reservation logic
   // Pass the generated IDs to ensure we have data to work with
-  await seedReservations(1000, [customer], [avenue]); 
+  await seedReservations(10000, [customer], [avenue]); 
   console.log("Seeding finished!"); 
 }
 
@@ -100,6 +104,28 @@ async function seedReservations(count: number, users: any[], avenues: any[]) {
     }
      console.log(`Successfully seeded ${successCount} reservations.`);
   }
+}
+
+async function seedOccupancyLogs(avenueId: string, count: number) {
+  console.log("Seeding Occupancy Logs...");
+  for (let i = 0; i < count; i++) {
+    const totalSpots = 100;
+    const currentSpots = faker.number.int({ min: 0, max: totalSpots });
+    
+    await prisma.occupancyLog.create({
+      data: {
+        parkingAvenueId: avenueId,
+        hour: faker.number.int({ min: 0, max: 23 }),
+        dayOfWeek: faker.number.int({ min: 0, max: 6 }),
+        isWeekend: Math.random() > 0.7 ? 1 : 0,
+        totalSpots: totalSpots,
+        currentSpots: currentSpots,
+        occupancyRate: (totalSpots - currentSpots) / totalSpots,
+        timestamp: faker.date.recent({ days: 30 }), // Log data for the last 30 days
+      },
+    });
+  }
+  console.log("Occupancy logs finished.");
 }
 
 main()
