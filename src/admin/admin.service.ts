@@ -666,6 +666,24 @@ export class AdminService {
       fullDay[item.hour].value = Math.round(item._avg.occupancyRate || 0);
     });
 
+    // Find the peek hour range (2-hour window)
+    let maxRate = -1;
+    let peakHour = 0;
+
+    fullDay.forEach((item, index) => {
+      if (item.value > maxRate) {
+        maxRate = item.value;
+        peakHour = index;
+      }
+    });
+
+    const formatHour = (h: number) => {
+      const hh = h % 24;
+      return hh === 12 ? '12 PM' : hh > 12 ? `${hh - 12} PM` : hh === 0 ? '12 AM' : `${hh} AM`;
+    };
+
+    const peakHours = `${formatHour(peakHour)} - ${formatHour(peakHour + 2)}`;
+
     const parkingDistribution = parkingDistRaw.map(dist => ({
       label: dist.type === 'ON_STREET' ? 'On-Street' : 'Off-Street',
       value: dist._count._all,
@@ -679,7 +697,7 @@ export class AdminService {
         utilization: hottestZoneData.value,
       },
       zoneUtilization,
-      peakHours: fullDay,
+      peakHours,
       parkingDistribution,
     };
   }
