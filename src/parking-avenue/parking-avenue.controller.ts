@@ -211,41 +211,15 @@ export class ParkingAvenueController {
   @ApiBody({ type: UpdateParkingAvenueDto })
   @ApiOperation({ summary: 'update parking Avenue' })
   @ApiBearerAuth('JWT-auth')
-  @UseInterceptors(FileInterceptor('photoUrl', { storage: diskStorageConfig }))
   @Patch(':id')
   update(
     @Param('id') id: string,
     @Body() updateParkingAvenueDto: UpdateParkingAvenueDto,
-    @UploadedFile() legalDoc: Express.Multer.File,
     @Req() req: RequestWithUser
   ) {
-    const cleanupNewFiles = () => {
-      if (legalDoc?.path && fs.existsSync(legalDoc.path))
-        fs.unlinkSync(legalDoc.path);
-    };
-
-    if (legalDoc) {
-      if (legalDoc.size > 2 * 1024 * 1024) {
-        cleanupNewFiles();
-        throw new BadRequestException('Image must be smaller than 2MB');
-      }
-      if (!legalDoc.mimetype.match(/image\/(jpg|jpeg|png)/)) {
-        cleanupNewFiles();
-        throw new BadRequestException('Invalid image format');
-      }
-
-      updateParkingAvenueDto.legalDoc = legalDoc.path;
-    }
-
-
-
-    try {
+      
       return this.parkingAvenueService.update(id, updateParkingAvenueDto, req.user.id);
 
-    } catch (error) {
-      cleanupNewFiles();
-      throw error;
-    }
   }
 
   @UseGuards(JwtAuthGuard)

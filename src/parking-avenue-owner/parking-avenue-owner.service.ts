@@ -285,47 +285,58 @@ async getDashboardOverview(ownerId: string): Promise<GetDashboardOverviewDto> {
     };
   }
 
-  async getTodayOccupancyChartData(ownerId: string): Promise<GetTodayOccupancyChartDto> {
-    const avenues = await this.db.parkingAvenue.findMany({
-      where: { ownerId: ownerId },
-      select: { id: true },
-    });
+async getTodayOccupancyChartData(ownerId: string): Promise<any[]> {
+  const avenues = await this.db.parkingAvenue.findMany({
+    where: { ownerId: ownerId },
+    select: { id: true },
+  });
 
-    const avenueIds = avenues.map((ave) => ave.id);
+  const avenueIds = avenues.map((ave) => ave.id);
 
-    if (avenueIds.length === 0) {
-      return this.generateEmpty24HourArray();
-    }
+  const result = Array.from({ length: 24 }, (_, hour) => {
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+    return {
+      time: `${displayHour} ${period}`,
+      occupancy: 0,
+    };
+  });
 
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-
-    const occupancyLogsAggregated = await this.db.occupancyLog.groupBy({
-      by: ['hour'],
-      where: {
-        parkingAvenueId: { in: avenueIds },
-        timestamp: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
-      },
-      _avg: {
-        occupancyRate: true,
-      },
-      orderBy: {
-        hour: 'asc',
-      },
-    });
-
-    const fullDayData: GetTodayOccupancyChartDto = this.generateEmpty24HourArray();
-
-    occupancyLogsAggregated.forEach((log) => {
-      fullDayData[log.hour].averageOccupancyRate = log._avg.occupancyRate || 0;
-    });
-
-    return fullDayData;
+  if (avenueIds.length === 0) {
+    return result;
   }
+
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+  const occupancyLogsAggregated = await this.db.occupancyLog.groupBy({
+    by: ['hour'],
+    where: {
+      parkingAvenueId: { in: avenueIds },
+      timestamp: {
+        gte: startOfDay,
+        lte: endOfDay,
+      },
+    },
+    _avg: {
+      occupancyRate: true,
+    },
+    orderBy: {
+      hour: 'asc',
+    },
+  });
+
+  // Map the aggregated data into our formatted array
+  occupancyLogsAggregated.forEach((log) => {
+    if (result[log.hour]) {
+      // Rounding to nearest whole number as per your "15" example
+      result[log.hour].occupancy = Math.round(log._avg.occupancyRate || 0);
+    }
+  });
+
+  return result;
+}
 
   private generateEmpty24HourArray(): GetTodayOccupancyChartDto {
     return Array.from({ length: 24 }, (_, i) => ({
@@ -562,6 +573,37 @@ async getDashboardOverview(ownerId: string): Promise<GetDashboardOverviewDto> {
 
     return fullDay;
   }
+
+  async getAverageOccupancyByOwner(ownerId: string) {
+  // 1. Fetch aggregation from the database
+  const stats = await this.db.occupancyLog.groupBy({
+    by: ['hour'],
+    where: {
+      parkingAvenue: {
+        ownerId: ownerId,
+      },
+    },
+    _avg: {
+      occupancyRate: true,
+    },
+    orderBy: {
+      hour: 'asc',
+    },
+  });
+
+  // 2. Format the data to match your required output
+  return stats.map((item) => ({
+    hour: this.formatHour(item.hour),
+    rate: Math.round(item._avg.occupancyRate || 0),
+  }));
+}
+
+// Helper to convert 0-23 integer to "6 AM", "12 PM", etc.
+private formatHour(hour: number): string {
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const formattedHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${formattedHour} ${ampm}`;
+}
 
   async getRevenueTrends(ownerId: string) {
     const avenueIds = await this.getOwnedAvenueIds(ownerId);
