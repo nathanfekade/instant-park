@@ -15,7 +15,7 @@ export class AiInsightService {
     this.genAI = new GoogleGenerativeAI(apiKey || '');
   }
 
-  async generateProviderInsight(ownerId: string): Promise<{ insight: string }> {
+  async generateProviderInsight(ownerId: string): Promise<{ insights: any[] }> {
     try {
       const avenues = await this.databaseService.parkingAvenue.findMany({
         where: { ownerId },
@@ -23,7 +23,16 @@ export class AiInsightService {
       });
 
       if (!avenues.length) {
-        return { insight: "You currently do not have any registered parking avenues. Add a location to start receiving insights." };
+        return {
+          insights: [
+            {
+              title: "No Locations Added",
+              description: "Add a parking avenue to start receiving AI insights.",
+              impact: "info",
+              type: "info"
+            }
+          ]
+        };
       }
 
       const avenueIds = avenues.map(a => a.id);
@@ -62,13 +71,24 @@ export class AiInsightService {
         
         Provide a brief, actionable insight report for the dashboard. 
         Tone: Professional, encouraging, and highly concise.
-        Format: Use short paragraphs or 2-3 bullet points. Do not include a generic introduction or greeting. Focus immediately on the analysis and 1 or 2 recommendations (e.g., dynamic pricing, space allocation, predicting peak hours). Maximum 150 words.
+        Return exactly 3 predictive insights in a valid JSON array format. 
+          Each object must have:
+          - title: string (concise)
+          - description: string (max 15 words)
+          - impact: "high" | "medium" | "low"
+          - type: "opportunity" | "warning" | "info"
+
+          Output ONLY the JSON array. No markdown, no prose.
       `;
 
       const model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
       const result = await model.generateContent(prompt);
 
-      return { insight: result.response.text().trim() };
+      const responseText = result.response.text();
+      // Clean the text in case the AI wraps it in ```json blocks
+      const cleanedJson = responseText.replace(/```json|```/g, "").trim();
+
+      return { insights: JSON.parse(cleanedJson) };
 
     } catch (error) {
       this.logger.error('Failed to generate provider insight', error);
