@@ -201,6 +201,7 @@ export class ParkingAvenueController {
   }
 
   @Get('check-ins/:id')
+  @ApiOperation({ summary: 'get list of checked in users from parking avenue' })
   async getAvenueCheckIns(@Param('id') parkingAvenueId: string, @Query() query: GetCheckInsDto,) {
     return this.parkingAvenueService.getAvenueCheckIns(parkingAvenueId, query);
   }
