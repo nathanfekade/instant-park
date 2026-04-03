@@ -340,6 +340,7 @@ export class ParkingAvenueService {
           status: true,
           parkingAvenue: {
             select: {
+              id: true,
               name: true,
               parkingAvenueImage: {
                 select: {
